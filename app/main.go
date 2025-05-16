@@ -39,7 +39,7 @@ func main() {
 		receivedData := string(buf[:size])
 		fmt.Printf("Received %d bytes from %s: %s\n", size, source, receivedData)
 
-		h := DNSHeader{1234, 12, 0, 0, 0, 0}
+		h := DNSHeader{1234, 1 << 15, 0, 0, 0, 0}
 		response, err := h.Encode()
 
 		if err != nil {
