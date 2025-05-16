@@ -27,7 +27,7 @@ func (h *DNSHeader) Encode() ([]byte, error) {
 	fields := []any{h.ID, h.FLAGS, h.QDCOUNT, h.ANCOUNT, h.NSCOUNT, h.ARCOUNT}
 
 	for _, field := range fields {
-		if err := binary.Write(buf, binary.LittleEndian, field); err != nil {
+		if err := binary.Write(buf, binary.BigEndian, field); err != nil {
 			return nil, err
 		}
 	}
