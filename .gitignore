@@ -2,3 +2,5 @@ app/app.exe
 cache
 configs
 compose.yml
+.idea
+app/app

@@ -62,7 +62,7 @@ func (q *DNSQuestion) Encode() ([]byte, error) {
 		buf.WriteString(label)
 	}
 
-	buf.WriteByte(uint8(00))
+	buf.WriteByte(0)
 
 	fields := []any{q.Type, q.Class}
 	for _, field := range fields {

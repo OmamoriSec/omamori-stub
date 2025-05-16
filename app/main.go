@@ -53,6 +53,7 @@ func main() {
 		}
 
 		dq.Header.QDCOUNT = 1
+		dq.Header.ARCOUNT = 0
 		dq.Header.FLAGS = 1 << 15
 		response, err := dq.Encode()
 
