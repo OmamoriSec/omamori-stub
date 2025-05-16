@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+// -- STRUCT START -- //
+
 type DNSHeader struct {
 	ID uint16 // Packet Identifier
 	// Flags is a 16-bit field that includes QR, OPCODE, AA, TC, RD, RA, Z, and RCODE
@@ -30,12 +32,26 @@ type DNSQuestion struct {
 	Class uint16
 }
 
+type DNSAnswer struct {
+	Name   string
+	Type   uint16
+	Class  uint16
+	TTL    uint32
+	Length uint16
+	Data   []byte
+}
+
 type DNSQuery struct {
 	Header *DNSHeader
 	// As per RFC question section contains a list of questions,
 	// Here for simplicity, will only consider 1
 	Questions *DNSQuestion
+	Answer    *DNSAnswer
 }
+
+// -- STRUCT END -- //
+
+// -- ENCODE METHOD START --//
 
 func (h *DNSHeader) Encode() ([]byte, error) {
 	buf := new(bytes.Buffer)
@@ -73,6 +89,28 @@ func (q *DNSQuestion) Encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func (a *DNSAnswer) Encode() ([]byte, error) {
+	buf := new(bytes.Buffer)
+
+	labels := strings.Split(a.Name, ".")
+	for _, label := range labels {
+		if len(label) > 63 {
+			return nil, errors.New("label too long")
+		}
+		buf.WriteByte(uint8(len(label)))
+		buf.WriteString(label)
+	}
+	buf.WriteByte(0)
+
+	_ = binary.Write(buf, binary.BigEndian, a.Type)
+	_ = binary.Write(buf, binary.BigEndian, a.Class)
+	_ = binary.Write(buf, binary.BigEndian, a.TTL)
+	_ = binary.Write(buf, binary.BigEndian, a.Length)
+	_ = binary.Write(buf, binary.BigEndian, a.Data)
+
+	return buf.Bytes(), nil
+}
+
 func (dq *DNSQuery) Encode() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
@@ -86,8 +124,15 @@ func (dq *DNSQuery) Encode() ([]byte, error) {
 		return nil, err
 	}
 	buf.Write(data)
+	data, err = dq.Answer.Encode()
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(data)
 	return buf.Bytes(), nil
 }
+
+// -- ENCODE METHOD END -- //
 
 func DecodeDNSQuery(data []byte) (*DNSQuery, error) {
 	var dq DNSQuery
