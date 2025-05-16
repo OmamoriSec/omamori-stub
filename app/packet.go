@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 )
 
 type DNSHeader struct {
@@ -37,13 +36,12 @@ func (h *DNSHeader) Encode() ([]byte, error) {
 }
 
 func DecodeDNSHeader(data []byte) (*DNSHeader, error) {
-	fmt.Println(len(data))
-	if len(data) != 12 {
+	if len(data) < 12 {
 		return nil, errors.New("malformed DNS header")
 	}
 	return &DNSHeader{
 		ID:      binary.BigEndian.Uint16(data[0:2]),
-		FLAGS:   binary.BigEndian.Uint16(data[0:4]),
+		FLAGS:   binary.BigEndian.Uint16(data[2:4]),
 		QDCOUNT: binary.BigEndian.Uint16(data[4:6]),
 		ANCOUNT: binary.BigEndian.Uint16(data[6:8]),
 		NSCOUNT: binary.BigEndian.Uint16(data[8:10]),
