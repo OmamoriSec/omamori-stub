@@ -5,13 +5,7 @@ import (
 	"net"
 )
 
-// Ensures gofmt doesn't remove the "net" import in stage 1 (feel free to remove this!)
-var _ = net.ListenUDP
-
 func main() {
-	// You can use print statements as follows for debugging, they'll be visible when running tests.
-	fmt.Println("Logs from your program will appear here!")
-
 	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:2053")
 	if err != nil {
 		fmt.Println("Failed to resolve UDP address:", err)
@@ -23,7 +17,15 @@ func main() {
 		fmt.Println("Failed to bind to address:", err)
 		return
 	}
-	defer udpConn.Close()
+
+	fmt.Println("Listening on", udpConn.LocalAddr().String())
+
+	defer func(udpConn *net.UDPConn) {
+		err := udpConn.Close()
+		if err != nil {
+			fmt.Println("Failed to close UDP connection:", err)
+		}
+	}(udpConn)
 
 	buf := make([]byte, 512)
 
@@ -37,8 +39,12 @@ func main() {
 		receivedData := string(buf[:size])
 		fmt.Printf("Received %d bytes from %s: %s\n", size, source, receivedData)
 
-		// Create an empty response
-		response := []byte{}
+		h := DNSHeader{1234, 12, 0, 0, 0, 0}
+		response, err := h.Encode()
+
+		if err != nil {
+			fmt.Println("Error encoding DNS header:", err)
+		}
 
 		_, err = udpConn.WriteToUDP(response, source)
 		if err != nil {
