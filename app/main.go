@@ -45,15 +45,15 @@ func main() {
 		}
 
 		receivedData := buf[:size]
-		header, err := DecodeDNSHeader(receivedData)
+		dq, err := DecodeDNSQuery(receivedData)
 		if err != nil {
 			fmt.Println("Failed to decode DNS header:", err)
 			writeResp(udpConn, []byte("Failed to decode DNS header"), source)
 			continue
 		}
 
-		h := DNSHeader{header.ID, 1 << 15, 0, 0, 0, 0}
-		response, err := h.Encode()
+		dq.Header.QDCOUNT = 1
+		response, err := dq.Encode()
 
 		if err != nil {
 			fmt.Println("Error encoding DNS header:", err)
