@@ -52,11 +52,14 @@ func main() {
 			continue
 		}
 
+		// update header according to answer
+
 		dq.Header.QDCOUNT = 1
 		dq.Header.ARCOUNT = 0
 		dq.Header.ANCOUNT = 1
-		dq.Header.FLAGS = 1 << 15
+		dq.Header.FLAGS = dq.Header.FLAGS | 1<<15
 
+		// create answer
 		dq.Answer = &DNSAnswer{dq.Questions.Name,
 			dq.Questions.Type,
 			dq.Questions.Class,
@@ -64,6 +67,7 @@ func main() {
 			1 << 2,
 			net.ParseIP("8.8.8.8").To4(),
 		}
+
 		response, err := dq.Encode()
 
 		if err != nil {
