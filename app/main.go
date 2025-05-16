@@ -5,6 +5,14 @@ import (
 	"net"
 )
 
+func writeResp(udpConn *net.UDPConn, resp []byte, addr *net.UDPAddr) {
+	_, err := udpConn.WriteToUDP(resp, addr)
+	if err != nil {
+		fmt.Println("Failed to send response:", err)
+	}
+
+}
+
 func main() {
 	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:2053")
 	if err != nil {
@@ -36,21 +44,21 @@ func main() {
 			break
 		}
 
-		receivedData := string(buf[:size])
-		fmt.Printf("Received %d bytes from %s: %s\n", size, source, receivedData)
+		receivedData := buf[:size]
+		header, err := DecodeDNSHeader(receivedData)
+		if err != nil {
+			fmt.Println("Failed to decode DNS header:", err)
+			writeResp(udpConn, []byte("Failed to decode DNS header"), source)
+			continue
+		}
 
-		h := DNSHeader{1234, 1 << 15, 0, 0, 0, 0}
+		h := DNSHeader{header.ID, 1 << 15, 0, 0, 0, 0}
 		response, err := h.Encode()
 
 		if err != nil {
 			fmt.Println("Error encoding DNS header:", err)
 		}
 
-		fmt.Println(response)
-
-		_, err = udpConn.WriteToUDP(response, source)
-		if err != nil {
-			fmt.Println("Failed to send response:", err)
-		}
+		writeResp(udpConn, response, source)
 	}
 }

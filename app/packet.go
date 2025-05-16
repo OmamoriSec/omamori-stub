@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 )
 
 type DNSHeader struct {
@@ -32,4 +33,18 @@ func (h *DNSHeader) Encode() ([]byte, error) {
 		}
 	}
 	return buf.Bytes(), nil
+}
+
+func DecodeDNSHeader(data []byte) (*DNSHeader, error) {
+	if len(data) != 12 {
+		return nil, errors.New("malformed DNS header")
+	}
+	return &DNSHeader{
+		ID:      binary.BigEndian.Uint16(data[0:2]),
+		FLAGS:   binary.BigEndian.Uint16(data[0:4]),
+		QDCOUNT: binary.BigEndian.Uint16(data[4:6]),
+		ANCOUNT: binary.BigEndian.Uint16(data[6:8]),
+		NSCOUNT: binary.BigEndian.Uint16(data[8:10]),
+		ARCOUNT: binary.BigEndian.Uint16(data[10:12]),
+	}, nil
 }
