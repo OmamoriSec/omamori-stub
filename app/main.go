@@ -46,6 +46,8 @@ func main() {
 			fmt.Println("Error encoding DNS header:", err)
 		}
 
+		fmt.Println(response)
+
 		_, err = udpConn.WriteToUDP(response, source)
 		if err != nil {
 			fmt.Println("Failed to send response:", err)
