@@ -62,6 +62,8 @@ func (q *DNSQuestion) Encode() ([]byte, error) {
 		buf.WriteString(label)
 	}
 
+	buf.WriteByte(uint8(00))
+
 	fields := []any{q.Type, q.Class}
 	for _, field := range fields {
 		if err := binary.Write(buf, binary.BigEndian, field); err != nil {
