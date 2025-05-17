@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"time"
 )
 
 func writeResp(udpConn *net.UDPConn, resp []byte, addr *net.UDPAddr) {
@@ -35,6 +36,16 @@ func main() {
 		}
 	}(udpConn)
 
+	go func() {
+		for {
+			err := loadBlockedSites("blocked.txt")
+			if err != nil {
+				fmt.Println("Reload error:", err)
+			}
+			time.Sleep(30 * time.Second)
+		}
+	}()
+
 	buf := make([]byte, 512)
 
 	for {
@@ -45,30 +56,16 @@ func main() {
 		}
 
 		receivedData := buf[:size]
-		dq, err := DecodeDNSQuery(receivedData)
+		dq, err := decodeDNSQuery(receivedData)
 		if err != nil {
 			fmt.Println("Failed to decode DNS header:", err)
 			writeResp(udpConn, []byte("Failed to decode DNS header"), source)
 			continue
 		}
 
-		// update header according to answer
+		dnsResponse := lookup(dq)
 
-		dq.Header.QDCOUNT = 1
-		dq.Header.ARCOUNT = 0
-		dq.Header.ANCOUNT = 1
-		dq.Header.FLAGS = dq.Header.FLAGS | 1<<15
-
-		// create answer
-		dq.Answer = &DNSAnswer{dq.Questions.Name,
-			dq.Questions.Type,
-			dq.Questions.Class,
-			60,
-			1 << 2,
-			net.ParseIP("8.8.8.8").To4(),
-		}
-
-		response, err := dq.Encode()
+		response, err := dnsResponse.encode()
 
 		if err != nil {
 			fmt.Println("Error encoding DNS header:", err)

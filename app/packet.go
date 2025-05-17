@@ -53,7 +53,7 @@ type DNSQuery struct {
 
 // -- ENCODE METHOD START --//
 
-func (h *DNSHeader) Encode() ([]byte, error) {
+func (h *DNSHeader) encode() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	fields := []any{h.ID, h.FLAGS, h.QDCOUNT, h.ANCOUNT, h.NSCOUNT, h.ARCOUNT}
 
@@ -65,7 +65,7 @@ func (h *DNSHeader) Encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (q *DNSQuestion) Encode() ([]byte, error) {
+func (q *DNSQuestion) encode() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
 	labels := strings.Split(q.Name, ".")
@@ -89,7 +89,7 @@ func (q *DNSQuestion) Encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (a *DNSAnswer) Encode() ([]byte, error) {
+func (a *DNSAnswer) encode() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
 	labels := strings.Split(a.Name, ".")
@@ -111,20 +111,20 @@ func (a *DNSAnswer) Encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (dq *DNSQuery) Encode() ([]byte, error) {
+func (dq *DNSQuery) encode() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
-	data, err := dq.Header.Encode()
+	data, err := dq.Header.encode()
 	if err != nil {
 		return nil, err
 	}
 	buf.Write(data)
-	data, err = dq.Questions.Encode()
+	data, err = dq.Questions.encode()
 	if err != nil {
 		return nil, err
 	}
 	buf.Write(data)
-	data, err = dq.Answer.Encode()
+	data, err = dq.Answer.encode()
 	if err != nil {
 		return nil, err
 	}
@@ -134,14 +134,14 @@ func (dq *DNSQuery) Encode() ([]byte, error) {
 
 // -- ENCODE METHOD END -- //
 
-func DecodeDNSQuery(data []byte) (*DNSQuery, error) {
+func decodeDNSQuery(data []byte) (*DNSQuery, error) {
 	var dq DNSQuery
-	header, err := DecodeDNSHeader(data)
+	header, err := decodeDNSHeader(data)
 	if err != nil {
 		return nil, err
 	}
 	dq.Header = header
-	question, err := DecodeDNSQuestion(data, 12)
+	question, err := decodeDNSQuestion(data, 12)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +150,7 @@ func DecodeDNSQuery(data []byte) (*DNSQuery, error) {
 	return &dq, nil
 }
 
-func DecodeDNSHeader(data []byte) (*DNSHeader, error) {
+func decodeDNSHeader(data []byte) (*DNSHeader, error) {
 	if len(data) < 12 {
 		return nil, errors.New("malformed DNS header")
 	}
@@ -164,7 +164,7 @@ func DecodeDNSHeader(data []byte) (*DNSHeader, error) {
 	}, nil
 }
 
-func DecodeDNSQuestion(data []byte, offset int) (*DNSQuestion, error) {
+func decodeDNSQuestion(data []byte, offset int) (*DNSQuestion, error) {
 	var q DNSQuestion
 	var labels []string
 

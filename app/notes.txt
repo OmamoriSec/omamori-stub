@@ -28,3 +28,7 @@ Answer Record Count (ANCOUNT)	16 bits	Number of records in the Answer section.
 Authority Record Count (NSCOUNT)	16 bits	Number of records in the Authority section.
 
 Additional Record Count (ARCOUNT)	16 bits	Number of records in the Additional section.
+
+
+https://www.rfc-editor.org/rfc/rfc1035#section-4.1.4
+https://github.com/EmilHernvall/dnsguide/blob/b52da3b32b27c81e5c6729ac14fe01fef8b1b593/chapter1.md
