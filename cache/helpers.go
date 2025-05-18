@@ -1,6 +1,7 @@
 package cache
 
 import (
+	"fmt"
 	"strings"
 	"time"
 )
@@ -88,4 +89,14 @@ func NormalizeDomain(domain string) string {
 
 func (k Key) String() string {
 	return string(k.Type) + ":" + k.Domain
+}
+
+func (c *LRUCache) PrintCacheContents() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	fmt.Println("Cache contents:")
+	for key, entry := range c.items {
+		fmt.Printf("Key: %s, Record: %v\n", key, entry.record)
+	}
 }
