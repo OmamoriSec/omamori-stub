@@ -118,3 +118,5 @@ func (c *LRUCache) Remove(domain string, recordType RecordType) {
 func (c *LRUCache) Close() {
 	close(c.cleanUpCh)
 }
+
+// TODO! making cache persistent

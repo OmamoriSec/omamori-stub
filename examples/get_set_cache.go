@@ -87,6 +87,9 @@ func main() {
 	lookup(dnsCache, "non-existent-domain.example", cache.RecordTypeNXDomain)
 	lookup(dnsCache, "does-not-exists.example", cache.RecordTypeA)
 
+	fmt.Println("\n3. Printing cache contents")
+	dnsCache.PrintCacheContents()
+
 	fmt.Println("\nDone!")
 }
 
