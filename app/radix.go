@@ -1,6 +1,8 @@
 package main
 
-import "strings"
+import (
+	"strings"
+)
 
 // Radix Node methods //
 
@@ -11,9 +13,9 @@ type RadixNode struct {
 
 func (node *RadixNode) insert(word string) {
 	currNode := node
-	found := false
 
 	for len(word) > 0 {
+		found := false
 		for key, child := range currNode.children {
 			commonPrefixLen := currNode.commonPrefixLength(key, word)
 
@@ -44,8 +46,7 @@ func (node *RadixNode) insert(word string) {
 
 		if !found {
 			currNode.children[word] = NewRadixNode()
-			currNode.children[word].endOfWord = true
-			return
+			word = ""
 		}
 	}
 	currNode.endOfWord = true

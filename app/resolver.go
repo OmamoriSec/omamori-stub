@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net"
-	"strings"
 )
 
 // =============== DNS RELATED METHODS ===============
@@ -13,15 +12,15 @@ func resolveable(domain string) bool {
 		return false
 	}
 
-	// check for subdomain
-	parts := strings.Split(domain, ".")
-	for i := 1; i < len(parts); i++ {
-		sub := strings.Join(parts[i:], ".")
-		if blocked := blockedSites.search(sub); blocked {
-			return false
-		}
-
-	}
+	//// check for subdomain
+	//parts := strings.Split(domain, ".")
+	//for i := 1; i < len(parts); i++ {
+	//	sub := strings.Join(parts[i:], ".")
+	//	if blocked := blockedSites.search(sub); blocked {
+	//		return false
+	//	}
+	//
+	//}
 	return true
 }
 
