@@ -14,10 +14,14 @@ func writeResp(udpConn *net.UDPConn, resp []byte, addr *net.UDPAddr) {
 
 }
 
-func reloadBlockedSitesPeriodically(path string, interval time.Duration) {
+func loadConf(interval time.Duration) {
 	for {
-		if err := loadBlockedSites(path); err != nil {
+		if err := loadBlockedSites("blocked_file.txt"); err != nil {
 			log.Println("Failed to reload blocked sites:", err)
+		}
+
+		if err := loadUpstreamConf("conf"); err != nil {
+			log.Println("Failed to reload upstream conf:", err)
 		}
 		time.Sleep(interval)
 	}
@@ -76,7 +80,7 @@ func main() {
 	}(udpConn)
 
 	//  Load File Periodically
-	go reloadBlockedSitesPeriodically("blocked_file.txt", time.Second*30)
+	go loadConf(time.Second * 30)
 
 	handleDNSRequest(udpConn)
 }

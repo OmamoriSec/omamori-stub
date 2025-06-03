@@ -2,70 +2,14 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"log"
 	"net"
-	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 )
 
-var blockedSites = make(map[string]struct{})
-
-func loadBlockedSites(filename string) error {
-
-	blockedFilePath := filepath.Join(filepath.Dir(filename), filename)
-
-	_, err := os.Stat(blockedFilePath)
-	// Download File if it doesn't exist
-
-	if err != nil {
-		resp, err := http.Get("https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts")
-		if err != nil || resp.StatusCode != 200 {
-			return err
-		}
-		defer func(Body io.ReadCloser) {
-			_ = Body.Close()
-		}(resp.Body)
-
-		outFile, err := os.Create(filename)
-
-		if err != nil {
-			log.Println(err)
-			return err
-		}
-
-		defer func(outFile *os.File) {
-			_ = outFile.Close()
-		}(outFile)
-
-		_, err = io.Copy(outFile, resp.Body)
-
-		if err != nil {
-			return err
-		}
-	}
-
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return err
-	}
-
-	lines := strings.Split(string(data), "\n")
-
-	for _, line := range lines {
-		domain := strings.TrimSpace(line)
-		if domain != "" {
-			blockedSites[domain] = struct{}{}
-		}
-	}
-
-	return nil
-}
+// =============== DNS RELATED METHODS ===============
 
 func resolveable(domain string) bool {
-	if _, blocked := blockedSites[domain]; blocked {
+	if blocked := blockedSites.search(domain); blocked {
 		return false
 	}
 
@@ -73,7 +17,7 @@ func resolveable(domain string) bool {
 	parts := strings.Split(domain, ".")
 	for i := 1; i < len(parts); i++ {
 		sub := strings.Join(parts[i:], ".")
-		if _, blocked := blockedSites[sub]; blocked {
+		if blocked := blockedSites.search(sub); blocked {
 			return false
 		}
 

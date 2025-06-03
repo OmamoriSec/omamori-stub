@@ -1,0 +1,125 @@
+package main
+
+import (
+	"errors"
+	"io"
+	"log"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+// =============== CONFIGURATIONS ===============
+
+var blockedSites = RadixTree{root: NewRadixNode()}
+var upstream1, upstream2 string
+
+func loadBlockedSites(filename string) error {
+
+	blockedFilePath := filepath.Join(filepath.Dir(filename), filename)
+
+	_, err := os.Stat(blockedFilePath)
+	// Download File if it doesn't exist
+
+	if err != nil {
+		resp, err := http.Get("https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts")
+		if err != nil || resp.StatusCode != 200 {
+			return err
+		}
+		defer func(Body io.ReadCloser) {
+			_ = Body.Close()
+		}(resp.Body)
+
+		outFile, err := os.Create(filename)
+
+		if err != nil {
+			log.Println(err)
+			return err
+		}
+
+		defer func(outFile *os.File) {
+			_ = outFile.Close()
+		}(outFile)
+
+		_, err = io.Copy(outFile, resp.Body)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(data), "\n")
+
+	for _, line := range lines {
+		domain := strings.TrimSpace(line)
+
+		if domain == "" || strings.HasPrefix(domain, "#") {
+			continue
+		}
+
+		spaceIndex := strings.Index(domain, " ")
+		if spaceIndex != -1 {
+			domain = strings.TrimSpace(line[spaceIndex+1:])
+			blockedSites.insert(domain)
+		}
+	}
+
+	return nil
+}
+
+func isValidIP(ip string) bool {
+	return net.ParseIP(ip) != nil
+}
+
+func loadUpstreamConf(filename string) error {
+
+	blockedFilePath := filepath.Join(filepath.Dir(filename), filename)
+
+	_, err := os.Stat(blockedFilePath)
+	// Download File if it doesn't exist
+
+	if err != nil {
+		upstream1 = "1.1.1.1"
+		upstream2 = "208.67.220.220"
+		return nil
+	}
+
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(data), "\n")
+
+	confMap := make(map[string]string)
+
+	for _, line := range lines {
+		conf := strings.TrimSpace(line)
+		if conf == "" || strings.HasPrefix(conf, "#") {
+			continue // skip empty lines and comments
+		}
+
+		spaceIndex := strings.Index(conf, " ")
+		if spaceIndex != -1 {
+			confMap[conf[:spaceIndex]] = conf[spaceIndex+1:]
+		}
+	}
+
+	u1, u2 := confMap["UPSTREAM1"], confMap["UPSTREAM2"]
+
+	if !isValidIP(u1) || !isValidIP(u2) {
+		return errors.New("invalid IP address in config file")
+	}
+
+	upstream1 = u1
+	upstream2 = u2
+
+	return nil
+}
