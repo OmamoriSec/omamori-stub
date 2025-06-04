@@ -130,8 +130,8 @@ func (dq *DNSQuery) encode() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+		buf.Write(data)
 	}
-	buf.Write(data)
 	return buf.Bytes(), nil
 }
 
@@ -206,7 +206,7 @@ func decodeDnsAnswer(data []byte) (*DNSAnswer, error) {
 		return nil, errors.New("no answers in DNS response")
 	}
 
-	offset := 12
+	offset := 12 // as we skipped header
 
 	// Skip Question Section
 	for {
@@ -222,7 +222,7 @@ func decodeDnsAnswer(data []byte) (*DNSAnswer, error) {
 	offset += 4
 
 	// Parse first Answer
-	// NAME: 2 bytes (could be pointer 0xC0XX)
+	// NAME: 2 bytes
 	if offset+12 > len(data) {
 		return nil, errors.New("truncated DNS answer")
 	}

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"net"
 	"omamori/app/cache"
 	"time"
@@ -18,6 +18,7 @@ func resolveable(domain string) bool {
 
 func lookup(dnsQuery *DNSQuery) *DNSQuery {
 
+	flags := dnsQuery.Header.FLAGS
 	// update header according to answer
 	dnsQuery.Header.QDCOUNT = 1
 	dnsQuery.Header.ARCOUNT = 0
@@ -38,7 +39,7 @@ func lookup(dnsQuery *DNSQuery) *DNSQuery {
 	}
 
 	if !resolveable(dnsQuery.Questions.Name) {
-		fmt.Printf("%s is not resolvable\n", dnsQuery.Questions.Name)
+		log.Printf("%s is not resolvable\n", dnsQuery.Questions.Name)
 		return dnsQuery
 	}
 
@@ -46,7 +47,7 @@ func lookup(dnsQuery *DNSQuery) *DNSQuery {
 	if found {
 		// update answer
 		dnsQuery.Answer.Data = cachedRecord.Data
-		fmt.Printf("Cache hit for %s\n", dnsQuery.Questions.Name)
+		log.Printf("Cache hit for %s\n", dnsQuery.Questions.Name)
 		return dnsQuery
 	}
 
@@ -55,7 +56,7 @@ func lookup(dnsQuery *DNSQuery) *DNSQuery {
 	upstreamQuery, _ := (&DNSQuery{
 		Header: &DNSHeader{
 			ID:      dnsQuery.Header.ID,
-			FLAGS:   0,
+			FLAGS:   flags,
 			QDCOUNT: 1,
 			ANCOUNT: 0,
 			NSCOUNT: 0,
@@ -75,36 +76,37 @@ func lookup(dnsQuery *DNSQuery) *DNSQuery {
 		conn, err := net.DialUDP("udp4", nil, &net.UDPAddr{IP: net.ParseIP(upstream), Port: 53})
 
 		if err != nil {
-			fmt.Printf("Error %s\n", err)
+			log.Printf("Error %s\n", err)
 			return dnsQuery
 		}
 
 		_, err = conn.Write(upstreamQuery)
 		if err != nil {
-			fmt.Printf("Error %s\n", err)
+			log.Printf("Error %s\n", err)
 			continue
 		}
 
-		_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(1 * time.Second))
 
 		buf := make([]byte, 512)
 		n, err := conn.Read(buf)
 		if err != nil {
-			fmt.Printf("Error %s\n", err)
+			log.Printf("Error %s\n", err)
 			continue
 		}
 
 		response, err := decodeDnsAnswer(buf[:n])
 		if err != nil {
-			fmt.Printf("Error %s\n", err)
+			log.Printf("Error %s\n", err)
 			continue
 		}
 
 		dnsQuery.Answer.Data = response.Data
 		dnsQuery.Answer.TTL = response.TTL
+		dnsQuery.Answer.Length = response.Length
 		go cache.DnsCache.Set(dnsQuery.Questions.Name, &cache.Record{
 			Type:      cache.RecordType(dnsQuery.Questions.Type),
-			ExpiresAt: time.Unix(int64(response.TTL), 0),
+			ExpiresAt: time.Now().Add(time.Duration(response.TTL) * time.Second),
 			Data:      response.Data,
 		}) // adding value in cache
 

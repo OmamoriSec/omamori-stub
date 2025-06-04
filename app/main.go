@@ -36,8 +36,8 @@ func handleDNSRequest(udpConn *net.UDPConn) {
 		receivedData := buf[:size]
 		dq, err := decodeDNSQuery(receivedData)
 		if err != nil {
-			log.Println("Failed to decode DNS header:", err)
-			writeResp(udpConn, []byte("Failed to decode DNS header"), source)
+			log.Println("Failed to decode DNS packet:", err)
+			// don't want to response to malformed packets
 			continue
 		}
 
