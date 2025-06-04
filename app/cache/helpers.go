@@ -2,9 +2,12 @@ package cache
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
+
+var DnsCache = DNSCache(1000)
 
 func (c *LRUCache) removeEntry(e *entry) {
 	// updating the next and prev pointers
@@ -88,7 +91,7 @@ func NormalizeDomain(domain string) string {
 }
 
 func (k Key) String() string {
-	return string(k.Type) + ":" + k.Domain
+	return strconv.Itoa(int(k.Type)) + ":" + k.Domain
 }
 
 func (c *LRUCache) PrintCacheContents() {

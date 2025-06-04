@@ -2,26 +2,26 @@ package cache
 
 import "time"
 
-type RecordType string
+type RecordType uint16
 
 const (
-	RecordTypeA        RecordType = "A"
-	RecordTypeAAAA     RecordType = "AAAA"
-	RecordTypeCNAME    RecordType = "CNAME"
-	RecordTypeMX       RecordType = "MX"
-	RecordTypeNS       RecordType = "NS"
-	RecordTypePTR      RecordType = "PTR"
-	RecordTypeSOA      RecordType = "SOA"
-	RecordTypeSRV      RecordType = "SRV"
-	RecordTypeTXT      RecordType = "TXT"
-	RecordTypeCAA      RecordType = "CAA"
-	RecordTypeNXDomain RecordType = "NXDomain"
+	RecordTypeA        RecordType = 1
+	RecordTypeAAAA     RecordType = 28
+	RecordTypeCNAME    RecordType = 5
+	RecordTypeMX       RecordType = 15
+	RecordTypeNS       RecordType = 2
+	RecordTypePTR      RecordType = 12
+	RecordTypeSOA      RecordType = 6
+	RecordTypeSRV      RecordType = 33
+	RecordTypeTXT      RecordType = 16
+	RecordTypeCAA      RecordType = 257
+	RecordTypeNXDomain RecordType = 65535
 )
 
 type Record struct {
 	Type      RecordType
-	ExpiresAt time.Time   // CreatedAt + TTL
-	Data      interface{} // record specific data
+	ExpiresAt time.Time // CreatedAt + TTL
+	Data      []byte    // record specific data
 }
 
 type ARecord struct {

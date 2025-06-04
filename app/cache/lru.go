@@ -5,11 +5,11 @@ import (
 )
 
 type Cache interface {
-	Get(domain string, recordType RecordType) (*Record, bool)
+	Get(domain string, recordType uint16) (*Record, bool)
 
 	Set(domain string, record *Record)
 
-	Remove(domain string, recordType RecordType)
+	Remove(domain string, recordType uint16)
 
 	Close()
 }
@@ -32,9 +32,9 @@ func DNSCache(capacity int) *LRUCache {
 	return cache
 }
 
-func (c *LRUCache) Get(domain string, recordType RecordType) (*Record, bool) {
-	key := NewCacheKey(domain, recordType).String()
-
+func (c *LRUCache) Get(domain string, recordType uint16) (*Record, bool) {
+	key := NewCacheKey(domain, RecordType(recordType)).String()
+	
 	c.mutex.RLock()
 	e, found := c.items[key]
 	c.mutex.RUnlock()
@@ -100,8 +100,8 @@ func (c *LRUCache) Set(domain string, record *Record) {
 	}
 }
 
-func (c *LRUCache) Remove(domain string, recordType RecordType) {
-	key := NewCacheKey(domain, recordType).String()
+func (c *LRUCache) Remove(domain string, recordType uint16) {
+	key := NewCacheKey(domain, RecordType(recordType)).String()
 
 	c.mutex.Lock()
 	defer c.mutex.Unlock()

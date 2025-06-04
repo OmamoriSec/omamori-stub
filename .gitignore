@@ -3,3 +3,4 @@ configs
 compose.yml
 .idea
 app/app
+*.txt
