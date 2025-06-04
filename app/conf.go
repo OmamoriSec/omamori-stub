@@ -13,10 +13,11 @@ import (
 
 // =============== CONFIGURATIONS ===============
 
-var blockedSites = RadixTree{root: NewRadixNode()}
+var blockedSites *RadixTree
 var upstream1, upstream2 string
 
 func loadBlockedSites(filename string) error {
+	blockedSites = NewRadixTree()
 
 	blockedFilePath := filepath.Join(filepath.Dir(filename), filename)
 
@@ -66,12 +67,26 @@ func loadBlockedSites(filename string) error {
 
 		spaceIndex := strings.Index(domain, " ")
 		if spaceIndex != -1 {
-			domain = strings.TrimSpace(line[spaceIndex+1:])
-			blockedSites.insert(domain)
+			endIndex := strings.Index(domain[spaceIndex+1:], " ")
+			if endIndex == -1 {
+				// there is no extra comment or space after the domain name
+				domain = strings.TrimSpace(line[spaceIndex+1:])
+			} else {
+				domain = strings.TrimSpace(domain[spaceIndex+1 : endIndex])
+			}
+			blockedSites.insert(reverseDomain(domain))
 		}
 	}
 
 	return nil
+}
+
+func reverseDomain(domain string) string {
+	parts := strings.Split(domain, ".")
+	for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
+		parts[i], parts[j] = parts[j], parts[i]
+	}
+	return strings.Join(parts, ".")
 }
 
 func isValidIP(ip string) bool {
@@ -86,8 +101,8 @@ func loadUpstreamConf(filename string) error {
 	// Download File if it doesn't exist
 
 	if err != nil {
-		upstream1 = "1.1.1.1"
-		upstream2 = "208.67.220.220"
+		upstream1 = "1.1.1.1"        // cloudflare
+		upstream2 = "208.67.220.220" // open dns
 		return nil
 	}
 

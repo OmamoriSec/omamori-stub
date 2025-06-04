@@ -8,19 +8,9 @@ import (
 // =============== DNS RELATED METHODS ===============
 
 func resolveable(domain string) bool {
-	if blocked := blockedSites.search(domain); blocked {
+	if blocked := blockedSites.search(reverseDomain(domain)); blocked {
 		return false
 	}
-
-	//// check for subdomain
-	//parts := strings.Split(domain, ".")
-	//for i := 1; i < len(parts); i++ {
-	//	sub := strings.Join(parts[i:], ".")
-	//	if blocked := blockedSites.search(sub); blocked {
-	//		return false
-	//	}
-	//
-	//}
 	return true
 }
 

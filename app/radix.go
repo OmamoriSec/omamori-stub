@@ -7,8 +7,26 @@ import (
 // Radix Node methods //
 
 type RadixNode struct {
-	endOfWord bool
 	children  map[string]*RadixNode
+	endOfWord bool
+}
+
+func NewRadixNode() *RadixNode {
+	return &RadixNode{
+		endOfWord: false,
+		children:  nil,
+	}
+}
+
+func (node *RadixNode) addChild(key string, child *RadixNode) {
+	if node.children == nil {
+		node.children = make(map[string]*RadixNode)
+	}
+	node.children[key] = child
+}
+
+func (node *RadixNode) hasChildren() bool {
+	return node.children != nil && len(node.children) > 0
 }
 
 func (node *RadixNode) insert(word string) {
@@ -27,11 +45,11 @@ func (node *RadixNode) insert(word string) {
 				if commonPrefixLen < len(key) {
 					// split existing key
 					newChild := NewRadixNode()
-					newChild.children[remainingKey] = child
+					newChild.addChild(remainingKey, child)
 					newChild.endOfWord = false
 
 					// Replace the old key with the new one
-					currNode.children[commonPrefix] = newChild
+					currNode.addChild(commonPrefix, newChild)
 					delete(currNode.children, key)
 					currNode = newChild
 
@@ -45,8 +63,10 @@ func (node *RadixNode) insert(word string) {
 		}
 
 		if !found {
-			currNode.children[word] = NewRadixNode()
+			newNode := NewRadixNode()
+			currNode.addChild(word, newNode)
 			word = ""
+			currNode = newNode
 		}
 	}
 	currNode.endOfWord = true
@@ -79,11 +99,12 @@ func (node *RadixNode) commonPrefixLength(word1 string, word2 string) int {
 	return i
 }
 
-func NewRadixNode() *RadixNode {
-	return &RadixNode{
-		endOfWord: false,
-		children:  make(map[string]*RadixNode),
+func (node *RadixNode) countNodes() int {
+	count := 1
+	for _, child := range node.children {
+		count += child.countNodes()
 	}
+	return count
 }
 
 // Radix Tree Methods //
@@ -98,4 +119,8 @@ func (tree *RadixTree) insert(word string) {
 
 func (tree *RadixTree) search(word string) bool {
 	return tree.root.search(word)
+}
+
+func NewRadixTree() *RadixTree {
+	return &RadixTree{root: NewRadixNode()}
 }
