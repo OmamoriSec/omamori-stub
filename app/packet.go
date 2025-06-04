@@ -124,9 +124,12 @@ func (dq *DNSQuery) encode() ([]byte, error) {
 		return nil, err
 	}
 	buf.Write(data)
-	data, err = dq.Answer.encode()
-	if err != nil {
-		return nil, err
+
+	if dq.Answer != nil {
+		data, err = dq.Answer.encode()
+		if err != nil {
+			return nil, err
+		}
 	}
 	buf.Write(data)
 	return buf.Bytes(), nil
@@ -191,4 +194,60 @@ func decodeDNSQuestion(data []byte, offset int) (*DNSQuestion, error) {
 	offset += 4
 
 	return &q, nil
+}
+
+func decodeDnsAnswer(data []byte) (*DNSAnswer, error) {
+	if len(data) < 12 {
+		return nil, errors.New("invalid DNS response")
+	}
+
+	anCount := binary.BigEndian.Uint16(data[6:8])
+	if anCount == 0 {
+		return nil, errors.New("no answers in DNS response")
+	}
+
+	offset := 12
+
+	// Skip Question Section
+	for {
+		length := int(data[offset])
+		if length == 0 {
+			offset++
+			break
+		}
+		offset += 1 + length
+	}
+
+	// Skip QTYPE (2 bytes) and QCLASS (2 bytes)
+	offset += 4
+
+	// Parse first Answer
+	// NAME: 2 bytes (could be pointer 0xC0XX)
+	if offset+12 > len(data) {
+		return nil, errors.New("truncated DNS answer")
+	}
+
+	// Skip name pointer
+	offset += 2
+
+	answerType := binary.BigEndian.Uint16(data[offset : offset+2])
+	answerClass := binary.BigEndian.Uint16(data[offset+2 : offset+4])
+	ttl := binary.BigEndian.Uint32(data[offset+4 : offset+8])
+	dataLen := binary.BigEndian.Uint16(data[offset+8 : offset+10])
+	offset += 10
+
+	if offset+int(dataLen) > len(data) {
+		return nil, errors.New("incomplete DNS answer data")
+	}
+
+	answerData := make([]byte, dataLen)
+	copy(answerData, data[offset:offset+int(dataLen)])
+
+	return &DNSAnswer{
+		Type:   answerType,
+		Class:  answerClass,
+		TTL:    ttl,
+		Length: dataLen,
+		Data:   answerData,
+	}, nil
 }

@@ -29,53 +29,86 @@ func lookup(dnsQuery *DNSQuery) *DNSQuery {
 	// Setting RA (bit 7)
 	dnsQuery.Header.FLAGS = dnsQuery.Header.FLAGS | 1<<7
 
+	dnsQuery.Answer = &DNSAnswer{dnsQuery.Questions.Name,
+		dnsQuery.Questions.Type,
+		dnsQuery.Questions.Class,
+		600,
+		1 << 2,
+		net.ParseIP("0.0.0.0").To4(),
+	}
+
 	if !resolveable(dnsQuery.Questions.Name) {
 		fmt.Printf("%s is not resolvable\n", dnsQuery.Questions.Name)
-
-		// create answer
-		data := net.ParseIP("0.0.0.0").To4()
-		dnsQuery.Answer = &DNSAnswer{dnsQuery.Questions.Name,
-			dnsQuery.Questions.Type,
-			dnsQuery.Questions.Class,
-			60,
-			1 << 2,
-			data,
-		}
-
 		return dnsQuery
 	}
 
 	cachedRecord, found := cache.DnsCache.Get(dnsQuery.Questions.Name, dnsQuery.Questions.Type)
 	if found {
 		// update answer
-		dnsQuery.Answer = &DNSAnswer{dnsQuery.Questions.Name,
-			dnsQuery.Questions.Type,
-			dnsQuery.Questions.Class,
-			60,
-			1 << 2,
-			cachedRecord.Data,
-		}
+		dnsQuery.Answer.Data = cachedRecord.Data
 		fmt.Printf("Cache hit for %s\n", dnsQuery.Questions.Name)
-
 		return dnsQuery
 	}
 
-	// TODO: @CosmicOppai make query to the upstream DNS resolver
 	// update answer as per upstream
-	responseIP := "8.8.8.8"
-	data := net.ParseIP(responseIP).To4()
-	cache.DnsCache.Set(dnsQuery.Questions.Name, &cache.Record{
-		Type:      cache.RecordType(dnsQuery.Questions.Type),
-		ExpiresAt: time.Now().Add(5 * time.Minute),
-		Data:      data,
-	})
 
-	dnsQuery.Answer = &DNSAnswer{dnsQuery.Questions.Name,
-		dnsQuery.Questions.Type,
-		dnsQuery.Questions.Class,
-		60,
-		1 << 2,
-		data,
+	upstreamQuery, _ := (&DNSQuery{
+		Header: &DNSHeader{
+			ID:      dnsQuery.Header.ID,
+			FLAGS:   0,
+			QDCOUNT: 1,
+			ANCOUNT: 0,
+			NSCOUNT: 0,
+			ARCOUNT: 0,
+		},
+		Questions: &DNSQuestion{
+			Name:  dnsQuery.Questions.Name,
+			Type:  dnsQuery.Questions.Type,
+			Class: dnsQuery.Questions.Class,
+		},
+	}).encode()
+
+	var upStreamServers = []string{upstream1, upstream2}
+
+	for _, upstream := range upStreamServers {
+
+		conn, err := net.DialUDP("udp4", nil, &net.UDPAddr{IP: net.ParseIP(upstream), Port: 53})
+
+		if err != nil {
+			fmt.Printf("Error %s\n", err)
+			return dnsQuery
+		}
+
+		_, err = conn.Write(upstreamQuery)
+		if err != nil {
+			fmt.Printf("Error %s\n", err)
+			continue
+		}
+
+		_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+
+		buf := make([]byte, 512)
+		n, err := conn.Read(buf)
+		if err != nil {
+			fmt.Printf("Error %s\n", err)
+			continue
+		}
+
+		response, err := decodeDnsAnswer(buf[:n])
+		if err != nil {
+			fmt.Printf("Error %s\n", err)
+			continue
+		}
+
+		dnsQuery.Answer.Data = response.Data
+		dnsQuery.Answer.TTL = response.TTL
+		go cache.DnsCache.Set(dnsQuery.Questions.Name, &cache.Record{
+			Type:      cache.RecordType(dnsQuery.Questions.Type),
+			ExpiresAt: time.Unix(int64(response.TTL), 0),
+			Data:      response.Data,
+		}) // adding value in cache
+
+		break
 	}
 
 	return dnsQuery

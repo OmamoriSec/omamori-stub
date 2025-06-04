@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"net"
-	"time"
 )
 
 func writeResp(udpConn *net.UDPConn, resp []byte, addr *net.UDPAddr) {
@@ -14,7 +13,7 @@ func writeResp(udpConn *net.UDPConn, resp []byte, addr *net.UDPAddr) {
 
 }
 
-func loadConf(interval time.Duration) {
+func loadConf() {
 	if err := loadBlockedSites("blocked_file.txt"); err != nil {
 		log.Println("Failed to reload blocked sites:", err)
 	}
@@ -43,7 +42,6 @@ func handleDNSRequest(udpConn *net.UDPConn) {
 		}
 
 		dnsResponse := lookup(dq)
-
 		response, err := dnsResponse.encode()
 
 		if err != nil {
@@ -77,7 +75,7 @@ func main() {
 	}(udpConn)
 
 	//  Load blocked sites and conf
-	loadConf(time.Second * 30)
+	loadConf()
 
 	handleDNSRequest(udpConn)
 }
