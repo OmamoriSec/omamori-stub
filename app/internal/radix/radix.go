@@ -6,30 +6,30 @@ import (
 
 // Radix Node methods //
 
-type RadixNode struct {
-	children  map[string]*RadixNode
+type Node struct {
+	children  map[string]*Node
 	endOfWord bool
 }
 
-func NewRadixNode() *RadixNode {
-	return &RadixNode{
+func NewRadixNode() *Node {
+	return &Node{
 		endOfWord: false,
 		children:  nil,
 	}
 }
 
-func (node *RadixNode) addChild(key string, child *RadixNode) {
+func (node *Node) addChild(key string, child *Node) {
 	if node.children == nil {
-		node.children = make(map[string]*RadixNode)
+		node.children = make(map[string]*Node)
 	}
 	node.children[key] = child
 }
 
-func (node *RadixNode) hasChildren() bool {
+func (node *Node) hasChildren() bool {
 	return node.children != nil && len(node.children) > 0
 }
 
-func (node *RadixNode) insert(word string) {
+func (node *Node) insert(word string) {
 	currNode := node
 
 	for len(word) > 0 {
@@ -72,7 +72,7 @@ func (node *RadixNode) insert(word string) {
 	currNode.endOfWord = true
 }
 
-func (node *RadixNode) search(word string) bool {
+func (node *Node) search(word string) bool {
 	currNode := node
 	for len(word) > 0 {
 		found := false
@@ -91,7 +91,7 @@ func (node *RadixNode) search(word string) bool {
 	return currNode.endOfWord
 }
 
-func (node *RadixNode) commonPrefixLength(word1 string, word2 string) int {
+func (node *Node) commonPrefixLength(word1 string, word2 string) int {
 	i := 0
 	for i < min(len(word1), len(word2)) && word1[i] == word2[i] {
 		i++
@@ -99,7 +99,7 @@ func (node *RadixNode) commonPrefixLength(word1 string, word2 string) int {
 	return i
 }
 
-func (node *RadixNode) countNodes() int {
+func (node *Node) countNodes() int {
 	count := 1
 	for _, child := range node.children {
 		count += child.countNodes()
@@ -109,18 +109,18 @@ func (node *RadixNode) countNodes() int {
 
 // Radix Tree Methods //
 
-type RadixTree struct {
-	root *RadixNode
+type Tree struct {
+	root *Node
 }
 
-func (tree *RadixTree) Insert(word string) {
+func (tree *Tree) Insert(word string) {
 	tree.root.insert(word)
 }
 
-func (tree *RadixTree) Search(word string) bool {
+func (tree *Tree) Search(word string) bool {
 	return tree.root.search(word)
 }
 
-func NewRadixTree() *RadixTree {
-	return &RadixTree{root: NewRadixNode()}
+func NewRadixTree() *Tree {
+	return &Tree{root: NewRadixNode()}
 }

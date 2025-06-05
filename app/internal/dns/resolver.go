@@ -17,7 +17,7 @@ func resolveable(domain string) bool {
 	return true
 }
 
-func Lookup(dnsQuery *DNSQuery) *DNSQuery {
+func Lookup(dnsQuery *Query) *Query {
 
 	flags := dnsQuery.Header.FLAGS
 	// update header according to answer
@@ -31,7 +31,7 @@ func Lookup(dnsQuery *DNSQuery) *DNSQuery {
 	// Setting RA (bit 7)
 	dnsQuery.Header.FLAGS = dnsQuery.Header.FLAGS | 1<<7
 
-	dnsQuery.Answer = &DNSAnswer{dnsQuery.Questions.Name,
+	dnsQuery.Answer = &Answer{dnsQuery.Questions.Name,
 		dnsQuery.Questions.Type,
 		dnsQuery.Questions.Class,
 		600,
@@ -54,8 +54,8 @@ func Lookup(dnsQuery *DNSQuery) *DNSQuery {
 
 	// update answer as per upstream
 
-	upstreamQuery, _ := (&DNSQuery{
-		Header: &DNSHeader{
+	upstreamQuery, _ := (&Query{
+		Header: &Header{
 			ID:      dnsQuery.Header.ID,
 			FLAGS:   flags,
 			QDCOUNT: 1,
@@ -63,7 +63,7 @@ func Lookup(dnsQuery *DNSQuery) *DNSQuery {
 			NSCOUNT: 0,
 			ARCOUNT: 0,
 		},
-		Questions: &DNSQuestion{
+		Questions: &Question{
 			Name:  dnsQuery.Questions.Name,
 			Type:  dnsQuery.Questions.Type,
 			Class: dnsQuery.Questions.Class,

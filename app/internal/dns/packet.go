@@ -9,7 +9,7 @@ import (
 
 // -- STRUCT START -- //
 
-type DNSHeader struct {
+type Header struct {
 	ID uint16 // Packet Identifier
 	// Flags is a 16-bit field that includes QR, OPCODE, AA, TC, RD, RA, Z, and RCODE
 	/*
@@ -26,13 +26,13 @@ type DNSHeader struct {
 	ARCOUNT uint16 // Additional Record Count (ARCOUNT)
 }
 
-type DNSQuestion struct {
+type Question struct {
 	Name  string
 	Type  uint16
 	Class uint16
 }
 
-type DNSAnswer struct {
+type Answer struct {
 	Name   string
 	Type   uint16
 	Class  uint16
@@ -41,19 +41,19 @@ type DNSAnswer struct {
 	Data   []byte
 }
 
-type DNSQuery struct {
-	Header *DNSHeader
+type Query struct {
+	Header *Header
 	// As per RFC question section contains a list of questions,
 	// Here for simplicity, will only consider 1
-	Questions *DNSQuestion
-	Answer    *DNSAnswer
+	Questions *Question
+	Answer    *Answer
 }
 
 // -- STRUCT END -- //
 
 // -- ENCODE METHOD START --//
 
-func (h *DNSHeader) encode() ([]byte, error) {
+func (h *Header) encode() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	fields := []any{h.ID, h.FLAGS, h.QDCOUNT, h.ANCOUNT, h.NSCOUNT, h.ARCOUNT}
 
@@ -65,7 +65,7 @@ func (h *DNSHeader) encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (q *DNSQuestion) encode() ([]byte, error) {
+func (q *Question) encode() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
 	labels := strings.Split(q.Name, ".")
@@ -89,7 +89,7 @@ func (q *DNSQuestion) encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (a *DNSAnswer) encode() ([]byte, error) {
+func (a *Answer) encode() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
 	labels := strings.Split(a.Name, ".")
@@ -111,7 +111,7 @@ func (a *DNSAnswer) encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (dq *DNSQuery) Encode() ([]byte, error) {
+func (dq *Query) Encode() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
 	data, err := dq.Header.encode()
@@ -137,8 +137,8 @@ func (dq *DNSQuery) Encode() ([]byte, error) {
 
 // -- ENCODE METHOD END -- //
 
-func DecodeDNSQuery(data []byte) (*DNSQuery, error) {
-	var dq DNSQuery
+func DecodeDNSQuery(data []byte) (*Query, error) {
+	var dq Query
 	header, err := decodeDNSHeader(data)
 	if err != nil {
 		return nil, err
@@ -153,11 +153,11 @@ func DecodeDNSQuery(data []byte) (*DNSQuery, error) {
 	return &dq, nil
 }
 
-func decodeDNSHeader(data []byte) (*DNSHeader, error) {
+func decodeDNSHeader(data []byte) (*Header, error) {
 	if len(data) < 12 {
 		return nil, errors.New("malformed DNS header")
 	}
-	return &DNSHeader{
+	return &Header{
 		ID:      binary.BigEndian.Uint16(data[0:2]),
 		FLAGS:   binary.BigEndian.Uint16(data[2:4]),
 		QDCOUNT: binary.BigEndian.Uint16(data[4:6]),
@@ -167,8 +167,8 @@ func decodeDNSHeader(data []byte) (*DNSHeader, error) {
 	}, nil
 }
 
-func decodeDNSQuestion(data []byte, offset int) (*DNSQuestion, error) {
-	var q DNSQuestion
+func decodeDNSQuestion(data []byte, offset int) (*Question, error) {
+	var q Question
 	var labels []string
 
 	for {
@@ -196,7 +196,7 @@ func decodeDNSQuestion(data []byte, offset int) (*DNSQuestion, error) {
 	return &q, nil
 }
 
-func decodeDnsAnswer(data []byte) (*DNSAnswer, error) {
+func decodeDnsAnswer(data []byte) (*Answer, error) {
 	if len(data) < 12 {
 		return nil, errors.New("invalid DNS response")
 	}
@@ -243,7 +243,7 @@ func decodeDnsAnswer(data []byte) (*DNSAnswer, error) {
 	answerData := make([]byte, dataLen)
 	copy(answerData, data[offset:offset+int(dataLen)])
 
-	return &DNSAnswer{
+	return &Answer{
 		Type:   answerType,
 		Class:  answerClass,
 		TTL:    ttl,

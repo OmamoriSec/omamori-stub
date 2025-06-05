@@ -14,7 +14,7 @@ import (
 
 // =============== CONFIGURATIONS ===============
 
-var BlockedSites *radix.RadixTree
+var BlockedSites *radix.Tree
 var (
 	Upstream2 string
 	Upstream1 string
