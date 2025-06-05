@@ -1,22 +1,23 @@
-package main
+package dns
 
 import (
 	"log"
 	"net"
-	"omamori/app/cache"
+	"omamori/app/internal/cache"
+	"omamori/app/internal/config"
 	"time"
 )
 
 // =============== DNS RELATED METHODS ===============
 
 func resolveable(domain string) bool {
-	if blocked := blockedSites.search(reverseDomain(domain)); blocked {
+	if blocked := config.BlockedSites.Search(config.ReverseDomain(domain)); blocked {
 		return false
 	}
 	return true
 }
 
-func lookup(dnsQuery *DNSQuery) *DNSQuery {
+func Lookup(dnsQuery *DNSQuery) *DNSQuery {
 
 	flags := dnsQuery.Header.FLAGS
 	// update header according to answer
@@ -67,9 +68,9 @@ func lookup(dnsQuery *DNSQuery) *DNSQuery {
 			Type:  dnsQuery.Questions.Type,
 			Class: dnsQuery.Questions.Class,
 		},
-	}).encode()
+	}).Encode()
 
-	var upStreamServers = []string{upstream1, upstream2}
+	var upStreamServers = []string{config.Upstream1, config.Upstream2}
 
 	for _, upstream := range upStreamServers {
 
@@ -97,7 +98,7 @@ func lookup(dnsQuery *DNSQuery) *DNSQuery {
 
 		response, err := decodeDnsAnswer(buf[:n])
 		if err != nil {
-			log.Printf("Error %s\n", err)
+			log.Printf("Error while fetching answer for %s via %s: %s\n", dnsQuery.Questions.Name, upstream, err)
 			continue
 		}
 

@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"net"
+	"omamori/app/internal/config"
+	"omamori/app/internal/dns"
 )
 
 func writeResp(udpConn *net.UDPConn, resp []byte, addr *net.UDPAddr) {
@@ -14,11 +16,11 @@ func writeResp(udpConn *net.UDPConn, resp []byte, addr *net.UDPAddr) {
 }
 
 func loadConf() {
-	if err := loadBlockedSites("blocked_file.txt"); err != nil {
+	if err := config.LoadBlockedSites("blocked_file.txt"); err != nil {
 		log.Println("Failed to reload blocked sites:", err)
 	}
 
-	if err := loadUpstreamConf("conf"); err != nil {
+	if err := config.LoadUpstreamConf("conf"); err != nil {
 		log.Println("Failed to reload upstream conf:", err)
 	}
 }
@@ -34,15 +36,15 @@ func handleDNSRequest(udpConn *net.UDPConn) {
 		}
 
 		receivedData := buf[:size]
-		dq, err := decodeDNSQuery(receivedData)
+		dq, err := dns.DecodeDNSQuery(receivedData)
 		if err != nil {
 			log.Println("Failed to decode DNS packet:", err)
 			// don't want to response to malformed packets
 			continue
 		}
 
-		dnsResponse := lookup(dq)
-		response, err := dnsResponse.encode()
+		dnsResponse := dns.Lookup(dq)
+		response, err := dnsResponse.Encode()
 
 		if err != nil {
 			log.Println("Error encoding DNS header:", err)

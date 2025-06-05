@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
-	"omamori/app/cache"
+	cache2 "omamori/app/internal/cache"
 	"time"
 )
 
@@ -11,63 +11,63 @@ func main() {
 	fmt.Println("DNS LRU Cache Example")
 	fmt.Println("=====================")
 
-	dnsCache := cache.DNSCache(10)
+	dnsCache := cache2.DNSCache(10)
 	defer dnsCache.Close()
 
 	fmt.Println("\n1. Adding entries to the cache")
 
 	ttl := 5 * time.Minute
 	response := "142.250.191.78"
-	googleARecord := &cache.Record{
-		Type:      cache.RecordType(1),
+	googleARecord := &cache2.Record{
+		Type:      cache2.RecordType(1),
 		ExpiresAt: time.Now().Add(ttl),
 		Data:      net.ParseIP(response).To4(),
 	}
 	dnsCache.Set("google.com", googleARecord)
 
 	response = "2a00:1450:4001:81a::200e"
-	googleAAAARecord := &cache.Record{
-		Type:      cache.RecordType(28),
+	googleAAAARecord := &cache2.Record{
+		Type:      cache2.RecordType(28),
 		ExpiresAt: time.Now().Add(ttl),
 		Data:      net.ParseIP(response).To4(),
 	}
 	dnsCache.Set("google.com", googleAAAARecord)
 
 	response = "example.com"
-	exampleCNAMERecord := &cache.Record{
-		Type:      cache.RecordType(5),
+	exampleCNAMERecord := &cache2.Record{
+		Type:      cache2.RecordType(5),
 		ExpiresAt: time.Now().Add(60 * time.Minute),
 		Data:      net.ParseIP(response).To4(),
 	}
 	dnsCache.Set("www.example.com", exampleCNAMERecord)
 
 	response = "93.184.216.34"
-	exampleARecord := &cache.Record{
-		Type:      cache.RecordType(1),
+	exampleARecord := &cache2.Record{
+		Type:      cache2.RecordType(1),
 		ExpiresAt: time.Now().Add(60 * time.Minute),
 		Data:      net.ParseIP(response).To4(),
 	}
 	dnsCache.Set("example.com", exampleARecord)
 
 	response = "alt1.gmail-smtp-in.l.google.com"
-	gmailMXRecord := &cache.Record{
-		Type:      cache.RecordType(15),
+	gmailMXRecord := &cache2.Record{
+		Type:      cache2.RecordType(15),
 		ExpiresAt: time.Now().Add(time.Hour),
 		Data:      net.ParseIP(response).To4(),
 	}
 	dnsCache.Set("gmail.com", gmailMXRecord)
 
 	response = "v=spf1 ip4:192.30.252.0/22 include:_netblocks.google.com ~all"
-	githubTXTRecord := &cache.Record{
-		Type:      cache.RecordType(16),
+	githubTXTRecord := &cache2.Record{
+		Type:      cache2.RecordType(16),
 		ExpiresAt: time.Now().Add(24 * time.Minute),
 		Data:      net.ParseIP(response).To4(),
 	}
 	dnsCache.Set("github.com", githubTXTRecord)
 
 	response = ""
-	nxRecord := &cache.Record{
-		Type:      cache.RecordType(65535),
+	nxRecord := &cache2.Record{
+		Type:      cache2.RecordType(65535),
 		ExpiresAt: time.Now().Add(10 * time.Minute),
 		Data:      net.ParseIP(response).To4(),
 	}
@@ -88,7 +88,7 @@ func main() {
 	fmt.Println("\nDone!")
 }
 
-func lookup(dnsCache *cache.LRUCache, domain string, recordType uint16) {
+func lookup(dnsCache *cache2.LRUCache, domain string, recordType uint16) {
 	record, found := dnsCache.Get(domain, recordType)
 	if !found {
 		fmt.Printf("❌ Domain %s not found in cache\n", domain)

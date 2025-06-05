@@ -1,4 +1,4 @@
-package main
+package radix
 
 import (
 	"strings"
@@ -113,11 +113,11 @@ type RadixTree struct {
 	root *RadixNode
 }
 
-func (tree *RadixTree) insert(word string) {
+func (tree *RadixTree) Insert(word string) {
 	tree.root.insert(word)
 }
 
-func (tree *RadixTree) search(word string) bool {
+func (tree *RadixTree) Search(word string) bool {
 	return tree.root.search(word)
 }
 

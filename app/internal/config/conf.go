@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"errors"
@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"omamori/app/internal/radix"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,11 +14,14 @@ import (
 
 // =============== CONFIGURATIONS ===============
 
-var blockedSites *RadixTree
-var upstream1, upstream2 string
+var BlockedSites *radix.RadixTree
+var (
+	Upstream2 string
+	Upstream1 string
+)
 
-func loadBlockedSites(filename string) error {
-	blockedSites = NewRadixTree()
+func LoadBlockedSites(filename string) error {
+	BlockedSites = radix.NewRadixTree()
 
 	blockedFilePath := filepath.Join(filepath.Dir(filename), filename)
 
@@ -74,14 +78,14 @@ func loadBlockedSites(filename string) error {
 			} else {
 				domain = strings.TrimSpace(domain[spaceIndex+1 : endIndex])
 			}
-			blockedSites.insert(reverseDomain(domain))
+			BlockedSites.Insert(ReverseDomain(domain))
 		}
 	}
 
 	return nil
 }
 
-func reverseDomain(domain string) string {
+func ReverseDomain(domain string) string {
 	parts := strings.Split(domain, ".")
 	for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
 		parts[i], parts[j] = parts[j], parts[i]
@@ -93,7 +97,7 @@ func isValidIP(ip string) bool {
 	return net.ParseIP(ip) != nil
 }
 
-func loadUpstreamConf(filename string) error {
+func LoadUpstreamConf(filename string) error {
 
 	blockedFilePath := filepath.Join(filepath.Dir(filename), filename)
 
@@ -101,8 +105,8 @@ func loadUpstreamConf(filename string) error {
 	// Download File if it doesn't exist
 
 	if err != nil {
-		upstream1 = "1.1.1.1"        // cloudflare
-		upstream2 = "208.67.220.220" // open dns
+		Upstream1 = "1.1.1.1"        // cloudflare
+		Upstream2 = "208.67.220.220" // open dns
 		return nil
 	}
 
@@ -133,8 +137,8 @@ func loadUpstreamConf(filename string) error {
 		return errors.New("invalid IP address in config file")
 	}
 
-	upstream1 = u1
-	upstream2 = u2
+	Upstream1 = u1
+	Upstream2 = u2
 
 	return nil
 }

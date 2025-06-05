@@ -1,4 +1,4 @@
-package main
+package dns
 
 import (
 	"bytes"
@@ -111,7 +111,7 @@ func (a *DNSAnswer) encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (dq *DNSQuery) encode() ([]byte, error) {
+func (dq *DNSQuery) Encode() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
 	data, err := dq.Header.encode()
@@ -137,7 +137,7 @@ func (dq *DNSQuery) encode() ([]byte, error) {
 
 // -- ENCODE METHOD END -- //
 
-func decodeDNSQuery(data []byte) (*DNSQuery, error) {
+func DecodeDNSQuery(data []byte) (*DNSQuery, error) {
 	var dq DNSQuery
 	header, err := decodeDNSHeader(data)
 	if err != nil {
