@@ -31,13 +31,15 @@ func Lookup(dnsQuery *Query) *Query {
 	// Setting RA (bit 7)
 	dnsQuery.Header.FLAGS = dnsQuery.Header.FLAGS | 1<<7
 
-	dnsQuery.Answer = &Answer{dnsQuery.Questions.Name,
+	defaultAnswer := &Answer{
+		dnsQuery.Questions.Name,
 		dnsQuery.Questions.Type,
 		dnsQuery.Questions.Class,
 		600,
 		1 << 2,
 		net.ParseIP("0.0.0.0").To4(),
 	}
+	dnsQuery.Answer = []*Answer{defaultAnswer}
 
 	if !resolveable(dnsQuery.Questions.Name) {
 		log.Printf("%s is not resolvable\n", dnsQuery.Questions.Name)
@@ -47,7 +49,7 @@ func Lookup(dnsQuery *Query) *Query {
 	cachedRecord, found := cache.DnsCache.Get(dnsQuery.Questions.Name, dnsQuery.Questions.Type)
 	if found {
 		// update answer
-		dnsQuery.Answer.Data = cachedRecord.Data
+		dnsQuery.Answer[0].Data = cachedRecord.Data
 		log.Printf("Cache hit for %s\n", dnsQuery.Questions.Name)
 		return dnsQuery
 	}
@@ -96,20 +98,28 @@ func Lookup(dnsQuery *Query) *Query {
 			continue
 		}
 
-		response, err := decodeDnsAnswer(buf[:n])
+		responses, err := decodeDnsAnswer(buf[:n], dnsQuery)
 		if err != nil {
 			log.Printf("Error while fetching answer for %s via %s: %s\n", dnsQuery.Questions.Name, upstream, err)
 			continue
 		}
 
-		dnsQuery.Answer.Data = response.Data
-		dnsQuery.Answer.TTL = response.TTL
-		dnsQuery.Answer.Length = response.Length
-		go cache.DnsCache.Set(dnsQuery.Questions.Name, &cache.Record{
-			Type:      cache.RecordType(dnsQuery.Questions.Type),
-			ExpiresAt: time.Now().Add(time.Duration(response.TTL) * time.Second),
-			Data:      response.Data,
-		}) // adding value in cache
+		if len(responses) > 0 {
+			// replacing the defaultAnswer with actual responses
+			dnsQuery.Answer = responses
+
+			// updating header to with actual number of answers
+			dnsQuery.Header.ANCOUNT = uint16(len(responses))
+
+			// cacnhing all the responses
+			for _, response := range responses {
+				go cache.DnsCache.Set(dnsQuery.Questions.Name, &cache.Record{
+					Type:      cache.RecordType(response.Type),
+					ExpiresAt: time.Now().Add(time.Duration(response.TTL) * time.Second),
+					Data:      response.Data,
+				})
+			}
+		}
 
 		break
 	}
