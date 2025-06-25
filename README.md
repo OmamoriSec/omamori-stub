@@ -3,6 +3,7 @@
 ## Setup
 
 ```bash
+apt install dnsutils -y
 git clone https://github.com/Cosmicoppai/omamori.git
 cd omamori/app  
 go build -o omamori .
