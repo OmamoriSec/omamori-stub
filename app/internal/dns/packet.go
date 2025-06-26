@@ -27,13 +27,13 @@ type Header struct {
 }
 
 type Question struct {
-	Name  string
+	Name  string // TODO! convert this to []byte
 	Type  uint16
 	Class uint16
 }
 
 type Answer struct {
-	Name   string
+	Name   []byte // changed to []byte to preserve original name bytes
 	Type   uint16
 	Class  uint16
 	TTL    uint32
@@ -92,8 +92,7 @@ func (q *Question) encode() ([]byte, error) {
 func (a *Answer) encode() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
-	compressionPointer := uint16(0xC00C)
-	_ = binary.Write(buf, binary.BigEndian, compressionPointer)
+	buf.Write(a.Name)
 
 	_ = binary.Write(buf, binary.BigEndian, a.Type)
 	_ = binary.Write(buf, binary.BigEndian, a.Class)
@@ -129,6 +128,26 @@ func (dq *Query) Encode() ([]byte, error) {
 		}
 	}
 	return buf.Bytes(), nil
+}
+
+func encodeDomainName(name string) ([]byte, error) {
+	// Convert domain name to DNS format
+	var buf []byte
+	labels := strings.Split(name, ".")
+
+	for _, label := range labels {
+		if len(label) == 0 {
+			// If the label is empty, skip it
+			continue
+		}
+		if len(label) > 63 {
+			return nil, errors.New("label too long")
+		}
+		buf = append(buf, byte(len(label)))
+		buf = append(buf, []byte(label)...)
+	}
+	buf = append(buf, 0) // Null byte to end the domain name
+	return buf, nil
 }
 
 // -- ENCODE METHOD END -- //
@@ -205,10 +224,15 @@ func decodeDnsAnswer(data []byte, dnsQuery *Query) ([]*Answer, error) {
 	offset := 12 // as we skipped header
 
 	// Skip Question Section
-	for {
+	for offset < len(data) {
 		length := int(data[offset])
 		if length == 0 {
 			offset++
+			break
+		}
+		// handling compression pointer in question
+		if length >= 0xC0 {
+			offset += 2
 			break
 		}
 		offset += 1 + length
@@ -220,14 +244,38 @@ func decodeDnsAnswer(data []byte, dnsQuery *Query) ([]*Answer, error) {
 
 	for i := 0; i < int(anCount); i++ {
 
-		// Parse first Answer
-		// NAME: 2 bytes
-		if offset+12 > len(data) {
+		if offset >= len(data) {
 			return nil, errors.New("truncated DNS answer")
 		}
 
-		// Skip name pointer
-		offset += 2
+		var nameBytes []byte // store original name bytes
+
+		if data[offset] >= 0xC0 {
+			nameBytes = make([]byte, 2)
+			copy(nameBytes, data[offset:offset+2])
+			offset += 2 // Compression pointer
+		} else {
+			nameEnd := offset
+			for nameEnd < len(data) {
+				length := int(data[nameEnd])
+				if length == 0 {
+					nameEnd++
+					break
+				}
+				if length >= 0xC0 {
+					nameEnd += 2 // Compression pointer
+					break
+				}
+				nameEnd += 1 + length
+			}
+			nameBytes = make([]byte, nameEnd-offset)
+			copy(nameBytes, data[offset:nameEnd])
+			offset = nameEnd
+		}
+
+		if offset+10 > len(data) {
+			return nil, errors.New("truncated DNS answer")
+		}
 
 		answerType := binary.BigEndian.Uint16(data[offset : offset+2])
 		answerClass := binary.BigEndian.Uint16(data[offset+2 : offset+4])
@@ -243,7 +291,7 @@ func decodeDnsAnswer(data []byte, dnsQuery *Query) ([]*Answer, error) {
 		copy(answerData, data[offset:offset+int(dataLen)])
 
 		answer := &Answer{
-			Name:   dnsQuery.Questions.Name,
+			Name:   nameBytes,
 			Type:   answerType,
 			Class:  answerClass,
 			TTL:    ttl,

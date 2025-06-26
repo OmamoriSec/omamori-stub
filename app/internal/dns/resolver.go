@@ -31,8 +31,14 @@ func Lookup(dnsQuery *Query) *Query {
 	// Setting RA (bit 7)
 	dnsQuery.Header.FLAGS = dnsQuery.Header.FLAGS | 1<<7
 
+	encodedName, err := encodeDomainName(dnsQuery.Questions.Name)
+	if err != nil {
+		log.Printf("Error encoding domain name %s: %s\n", dnsQuery.Questions.Name, err)
+		return dnsQuery
+	}
+
 	defaultAnswer := &Answer{
-		dnsQuery.Questions.Name,
+		encodedName,
 		dnsQuery.Questions.Type,
 		dnsQuery.Questions.Class,
 		600,
@@ -48,8 +54,25 @@ func Lookup(dnsQuery *Query) *Query {
 
 	cachedRecord, found := cache.DnsCache.Get(dnsQuery.Questions.Name, dnsQuery.Questions.Type)
 	if found {
+		encodedName, err := encodeDomainName(dnsQuery.Questions.Name)
+		if err != nil {
+			log.Printf("Error encoding domain name %s: %s\n", dnsQuery.Questions.Name, err)
+			return dnsQuery
+		}
+
 		// update answer
-		dnsQuery.Answer[0].Data = cachedRecord.Data
+		cachedAnswer := &Answer{
+			encodedName,
+			dnsQuery.Questions.Type,
+			dnsQuery.Questions.Class,
+			uint32(time.Until(cachedRecord.ExpiresAt).Seconds()),
+			uint16(len(cachedRecord.Data)),
+			cachedRecord.Data,
+		}
+
+		dnsQuery.Answer = []*Answer{cachedAnswer}
+		dnsQuery.Header.ANCOUNT = 1
+
 		log.Printf("Cache hit for %s\n", dnsQuery.Questions.Name)
 		return dnsQuery
 	}
