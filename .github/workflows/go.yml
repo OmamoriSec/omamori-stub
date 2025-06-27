@@ -25,4 +25,4 @@ jobs:
       run: go mod download
     
     - name: Build
-      run: go build -v ./app
+      run:  go build -v -o omamori ./app
