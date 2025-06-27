@@ -26,3 +26,11 @@ jobs:
     
     - name: Build
       run:  go build -v -o omamori ./app
+
+    - name: Upload release binary
+      uses: softprops/action-gh-release@v2
+      if: github.ref_type == 'tag'
+      with:
+        files: omamori
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
