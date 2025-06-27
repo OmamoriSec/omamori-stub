@@ -95,7 +95,7 @@ func Lookup(dnsQuery *Query) *Query {
 		},
 	}).Encode()
 
-	var upStreamServers = []string{config.Upstream1, config.Upstream2}
+	var upStreamServers = []string{config.Global.Upstream1, config.Global.Upstream2}
 
 	for _, upstream := range upStreamServers {
 

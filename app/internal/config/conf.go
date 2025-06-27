@@ -1,7 +1,8 @@
 package config
 
 import (
-	"errors"
+	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -15,15 +16,24 @@ import (
 // =============== CONFIGURATIONS ===============
 
 var BlockedSites *radix.Tree
-var (
-	Upstream2 string
-	Upstream1 string
-)
 
-func LoadBlockedSites(filename string) error {
+type Config struct {
+	Upstream2     string `json:"upstream2"`
+	Upstream1     string `json:"upstream1"`
+	CertPath      string `json:"cert_path"`
+	KeyPath       string `json:"key_path"`
+	UdpServerPort int    `json:"port"`
+	MapFile       string `json:"map_file"`
+	ConfigFile    string `json:"-"`
+	ConfigDir     string `json:"-"`
+}
+
+var Global = NewConfig()
+
+func LoadBlockedSites() error {
 	BlockedSites = radix.NewRadixTree()
 
-	blockedFilePath := filepath.Join(filepath.Dir(filename), filename)
+	blockedFilePath := Global.MapFile
 
 	_, err := os.Stat(blockedFilePath)
 	// Download File if it doesn't exist
@@ -37,7 +47,7 @@ func LoadBlockedSites(filename string) error {
 			_ = Body.Close()
 		}(resp.Body)
 
-		outFile, err := os.Create(filename)
+		outFile, err := os.Create(blockedFilePath)
 
 		if err != nil {
 			log.Println(err)
@@ -55,7 +65,7 @@ func LoadBlockedSites(filename string) error {
 		}
 	}
 
-	data, err := os.ReadFile(filename)
+	data, err := os.ReadFile(blockedFilePath)
 	if err != nil {
 		return err
 	}
@@ -97,48 +107,91 @@ func isValidIP(ip string) bool {
 	return net.ParseIP(ip) != nil
 }
 
-func LoadUpstreamConf(filename string) error {
-
-	blockedFilePath := filepath.Join(filepath.Dir(filename), filename)
-
-	_, err := os.Stat(blockedFilePath)
-	// Download File if it doesn't exist
-
-	if err != nil {
-		Upstream1 = "1.1.1.1"        // cloudflare
-		Upstream2 = "208.67.220.220" // open dns
-		return nil
-	}
-
-	data, err := os.ReadFile(filename)
+func LoadConfig() error {
+	data, err := os.ReadFile(Global.ConfigFile)
 	if err != nil {
 		return err
 	}
 
-	lines := strings.Split(string(data), "\n")
-
-	confMap := make(map[string]string)
-
-	for _, line := range lines {
-		conf := strings.TrimSpace(line)
-		if conf == "" || strings.HasPrefix(conf, "#") {
-			continue // skip empty lines and comments
-		}
-
-		spaceIndex := strings.Index(conf, " ")
-		if spaceIndex != -1 {
-			confMap[conf[:spaceIndex]] = conf[spaceIndex+1:]
-		}
+	parsedConfig := Config{}
+	err = json.Unmarshal(data, &parsedConfig)
+	if err != nil {
+		return err
 	}
 
-	u1, u2 := confMap["UPSTREAM1"], confMap["UPSTREAM2"]
-
-	if !isValidIP(u1) || !isValidIP(u2) {
-		return errors.New("invalid IP address in config file")
+	if isValidIP(parsedConfig.Upstream2) && isValidIP(parsedConfig.Upstream1) {
+		Global.Upstream2 = parsedConfig.Upstream2
+		Global.Upstream1 = parsedConfig.Upstream1
 	}
 
-	Upstream1 = u1
-	Upstream2 = u2
+	if parsedConfig.UdpServerPort > 0 && parsedConfig.UdpServerPort < 65535 {
+		Global.UdpServerPort = parsedConfig.UdpServerPort
+	}
+
+	if _, err = os.Stat(parsedConfig.MapFile); err == nil {
+		Global.MapFile = parsedConfig.MapFile
+	}
+
+	if _, err = os.Stat(parsedConfig.KeyPath); err == nil {
+		Global.KeyPath = parsedConfig.KeyPath
+	}
+
+	if _, err = os.Stat(parsedConfig.CertPath); err == nil {
+		Global.CertPath = parsedConfig.CertPath
+	}
 
 	return nil
+}
+
+func EnsureDefaultConfig() (*Config, error) {
+	// 0700 for directory: rwx------ - only owner (root, since it's in /etc/) can read/write/execute
+	// 0600 for file: rw------- - only owner can read/write
+
+	if _, err := os.Stat(Global.ConfigFile); err == nil {
+		// if config file exits, parse it
+		_ = LoadConfig()
+		return Global, nil
+	}
+
+	// Create dir if it doesn't exist
+	if err := os.MkdirAll(Global.ConfigDir, 0700); err != nil {
+		return nil, err
+	}
+
+	// Write default config
+	defaultConfig := fmt.Sprintf(`{
+	    "upstream1": "%s",
+	    "upstream2": "%s",
+        "cert_path": "%s",
+        "key_path": "%s",
+        "port": %d,
+		"map_file": "%s"
+    }`, Global.Upstream1, Global.Upstream2, Global.CertPath, Global.KeyPath, Global.UdpServerPort, Global.MapFile)
+
+	return Global, os.WriteFile(Global.ConfigFile, []byte(defaultConfig), 0600)
+}
+
+func NewConfig() *Config {
+	configDir := "/etc/omamori"
+	configFile := filepath.Join(configDir, "config.json")
+	mapFile := filepath.Join(configDir, "map.txt")
+
+	const (
+		upstream1 = "1.1.1.1"
+		upstream2 = "208.67.220.220"
+		certPath  = "/etc/omamori/cert/server.crt"
+		keyPath   = "/etc/omamori/cert/server.key"
+		port      = 2053
+	)
+
+	return &Config{
+		MapFile:       mapFile,
+		Upstream1:     upstream1,
+		Upstream2:     upstream2,
+		CertPath:      certPath,
+		KeyPath:       keyPath,
+		UdpServerPort: port,
+		ConfigFile:    configFile,
+		ConfigDir:     configDir,
+	}
 }

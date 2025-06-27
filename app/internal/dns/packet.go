@@ -27,7 +27,7 @@ type Header struct {
 }
 
 type Question struct {
-	Name  string // TODO! convert this to []byte
+	Name  string // TODO! convert this to []byte for consistency
 	Type  uint16
 	Class uint16
 }
