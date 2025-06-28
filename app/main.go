@@ -5,7 +5,7 @@ import (
 	"log"
 	"net"
 	"omamori/app/core/config"
-	dns "omamori/app/core/dns"
+	"omamori/app/core/dns"
 	"omamori/app/dohs"
 	"time"
 )

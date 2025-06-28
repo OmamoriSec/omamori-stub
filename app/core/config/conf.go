@@ -2,7 +2,6 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -16,6 +15,8 @@ import (
 // =============== CONFIGURATIONS ===============
 
 var BlockedSites *radix.Tree
+
+const AppName = "omamori"
 
 type Config struct {
 	Upstream2     string `json:"upstream2"`
@@ -159,29 +160,28 @@ func EnsureDefaultConfig() (*Config, error) {
 	}
 
 	// Write default config
-	defaultConfig := fmt.Sprintf(`{
-	    "upstream1": "%s",
-	    "upstream2": "%s",
-        "cert_path": "%s",
-        "key_path": "%s",
-        "port": %d,
-		"map_file": "%s"
-    }`, Global.Upstream1, Global.Upstream2, Global.CertPath, Global.KeyPath, Global.UdpServerPort, Global.MapFile)
-
-	return Global, os.WriteFile(Global.ConfigFile, []byte(defaultConfig), 0600)
+	configJson, err := json.MarshalIndent(Global, "", "    ")
+	if err != nil {
+		return nil, err
+	}
+	return Global, os.WriteFile(Global.ConfigFile, configJson, 0600)
 }
 
 func NewConfig() *Config {
-	configDir := "/etc/omamori"
-	configFile := filepath.Join(configDir, "config.json")
-	mapFile := filepath.Join(configDir, "map.txt")
+	rootConfigDir, err := os.UserConfigDir()
+	if err != nil {
+		log.Fatalf("Error: Fetching Config Directory: %v\n", err)
+	}
 
-	const (
-		upstream1 = "1.1.1.1"
-		upstream2 = "208.67.220.220"
-		certPath  = "/etc/omamori/cert/server.crt"
-		keyPath   = "/etc/omamori/cert/server.key"
-		port      = 2053
+	var (
+		configDir  = filepath.Join(rootConfigDir, AppName)
+		configFile = filepath.Join(configDir, "config.json")
+		mapFile    = filepath.Join(configDir, "map.txt")
+		certPath   = filepath.Join(configDir, "cert", "server.crt")
+		keyPath    = filepath.Join(configDir, "cert", "server.key")
+		upstream1  = "1.1.1.1"
+		upstream2  = "208.67.220.220"
+		port       = 2053
 	)
 
 	return &Config{
