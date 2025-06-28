@@ -7,8 +7,8 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"omamori/app/internal/config"
-	"omamori/app/internal/dns"
+	"omamori/app/core/config"
+	"omamori/app/core/dns"
 	"strings"
 )
 

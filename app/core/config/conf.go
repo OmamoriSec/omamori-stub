@@ -7,7 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"omamori/app/internal/radix"
+	"omamori/app/core/internal/radix"
 	"os"
 	"path/filepath"
 	"strings"

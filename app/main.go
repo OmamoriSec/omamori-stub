@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"omamori/app/core/config"
+	dns "omamori/app/core/dns"
 	"omamori/app/dohs"
-	"omamori/app/internal/config"
-	"omamori/app/internal/dns"
 	"time"
 )
 
