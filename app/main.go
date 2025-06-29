@@ -7,6 +7,7 @@ import (
 	"omamori/app/core/config"
 	"omamori/app/core/dns"
 	"omamori/app/dohs"
+	"omamori/app/ui"
 	"time"
 )
 
@@ -105,5 +106,7 @@ func main() {
 
 	go dohs.RunHttpServer()
 
-	handleDNSRequest(udpConn)
+	go handleDNSRequest(udpConn)
+
+	ui.StartGUI()
 }
