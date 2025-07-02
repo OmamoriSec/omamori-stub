@@ -2,12 +2,15 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"omamori/app/core/internal/radix"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -155,16 +158,39 @@ func EnsureDefaultConfig() (*Config, error) {
 	}
 
 	// Create dir if it doesn't exist
-	if err := os.MkdirAll(Global.ConfigDir, 0700); err != nil {
+	if err := os.MkdirAll(fmt.Sprintf("%s/cert", Global.ConfigDir), 0700); err != nil {
 		return nil, err
 	}
 
+	// create certs for HTTP2
+	cmd := exec.Command("openssl", "req", "-newkey", "rsa:2048", "-nodes",
+		"-keyout", Global.KeyPath,
+		"-x509", "-days", "365",
+		"-out", Global.CertPath,
+		"-subj", "/O=Omamori/CN=localhost",
+	)
+
+	cmd.Stdout = io.Discard
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		log.Fatalf("OpenSSL failed: %v", err)
+	}
+
 	// Write default config
-	configJson, err := json.MarshalIndent(Global, "", "    ")
+	err := SaveConfig()
 	if err != nil {
 		return nil, err
 	}
-	return Global, os.WriteFile(Global.ConfigFile, configJson, 0600)
+	return Global, nil
+}
+
+func SaveConfig() error {
+	configJson, err := json.MarshalIndent(Global, "", "    ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(Global.ConfigFile, configJson, 0600)
 }
 
 func NewConfig() *Config {
@@ -181,7 +207,7 @@ func NewConfig() *Config {
 		keyPath    = filepath.Join(configDir, "cert", "server.key")
 		upstream1  = "1.1.1.1"
 		upstream2  = "208.67.220.220"
-		port       = 2053
+		port       = 53
 	)
 
 	return &Config{
@@ -194,4 +220,27 @@ func NewConfig() *Config {
 		ConfigFile:    configFile,
 		ConfigDir:     configDir,
 	}
+}
+
+func UpdateConfig(config *Config) error {
+
+	if !(isValidIP(config.Upstream2) && isValidIP(config.Upstream1)) {
+		return errors.New("upstream2 or upstream1 are not valid")
+	}
+
+	if _, err := os.Stat(config.MapFile); err != nil {
+		return err
+	}
+
+	Global.Upstream2 = config.Upstream2
+	Global.Upstream1 = config.Upstream1
+
+	Global.MapFile = config.MapFile
+
+	// update the config file
+	if err := SaveConfig(); err != nil {
+		return err
+	}
+
+	return nil
 }

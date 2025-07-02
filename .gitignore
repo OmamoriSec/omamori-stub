@@ -4,3 +4,4 @@ compose.yml
 .idea
 app/app
 *.txt
+scripts/push-tag.ps1

@@ -3,13 +3,16 @@
 package dohs
 
 import (
+	"context"
 	b64 "encoding/base64"
+	"errors"
 	"io"
 	"log"
 	"net/http"
 	"omamori/app/core/config"
 	"omamori/app/core/dns"
 	"strings"
+	"time"
 )
 
 var (
@@ -17,11 +20,30 @@ var (
 	privateKEY = config.Global.KeyPath
 )
 
-func RunHttpServer() {
+func RunHttpServer(ctx context.Context) {
+	serv := &http.Server{
+		Addr:    ":443",
+		Handler: http.HandlerFunc(dohsHandler),
+	}
 
-	serv := http.Server{Addr: ":443", Handler: http.HandlerFunc(dohsHandler)}
-	log.Println("Starting DOHS server on port 443")
-	log.Fatal(serv.ListenAndServeTLS(publicKEY, privateKEY))
+	go func() {
+		log.Println("Starting DOHS server on port 443")
+		if err := serv.ListenAndServeTLS(publicKEY, privateKEY); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("DOHS server error: %v", err)
+		}
+	}()
+
+	// Wait for context cancellation
+	<-ctx.Done()
+
+	log.Println("Shutting down DOHS server...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := serv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("Error shutting down DOHS server: %v", err)
+	}
 }
 
 func dohsHandler(w http.ResponseWriter, r *http.Request) {

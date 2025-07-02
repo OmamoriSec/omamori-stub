@@ -10,7 +10,9 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"log"
+	"net"
 	"omamori/app/core/config"
+	"omamori/app/core/events"
 	"strconv"
 	"time"
 )
@@ -28,11 +30,10 @@ type OmamoriApp struct {
 	// Form fields
 	upstream1Entry *widget.Entry
 	upstream2Entry *widget.Entry
-	portEntry      *widget.Entry
 	mapFileEntry   *widget.Entry
-	certPathEntry  *widget.Entry
-	keyPathEntry   *widget.Entry
 	dohsCheck      *widget.Check
+
+	configChanged bool
 }
 
 func (o *OmamoriApp) createStatusBar() *fyne.Container {
@@ -55,7 +56,7 @@ func StartGUI() {
 	omamori.window = omamori.app.NewWindow("Omamori")
 	omamori.window.Resize(fyne.NewSize(800, 600))
 
-	omamori.config = config.NewConfig()
+	omamori.config = config.Global
 
 	omamori.setup()
 	omamori.window.ShowAndRun()
@@ -77,39 +78,17 @@ func (o *OmamoriApp) startServer() {
 	o.startStopButton.Refresh()
 
 	o.logMessage("Starting DNS server on port " + strconv.Itoa(o.config.UdpServerPort))
-
-	// TODO: Start actual DNS server here
+	events.GlobalEventChannel <- events.Event{Type: events.StartDnsServer}
 }
 
 func (o *OmamoriApp) stopServer() {
+	events.GlobalEventChannel <- events.Event{Type: events.StopDnsServer}
 	o.serverRunning = false
 	o.statusLabel.SetText("Server Status: Stopped")
 	o.startStopButton.SetText("Start Server")
 	o.startStopButton.Importance = widget.HighImportance
 	o.startStopButton.Refresh()
 
-	o.logMessage("DNS server stopped")
-}
-
-func (o *OmamoriApp) testDNSQuery() {
-	domainEntry := widget.NewEntry()
-	domainEntry.SetPlaceHolder("Enter domain to test (e.g., google.com)")
-
-	dialog.ShowForm("Test DNS Query", "Test", "Cancel", []*widget.FormItem{
-		widget.NewFormItem("Domain", domainEntry),
-	}, func(confirmed bool) {
-		if confirmed && domainEntry.Text != "" {
-			o.performDNSTest(domainEntry.Text)
-		}
-	}, o.window)
-}
-
-func (o *OmamoriApp) performDNSTest(domain string) {
-	o.logMessage(fmt.Sprintf("Testing DNS query for: %s", domain))
-
-	// TODO: Implement actual DNS test query
-
-	o.logMessage(fmt.Sprintf("DNS query test completed for: %s", domain))
 }
 
 func (o *OmamoriApp) logMessage(message string) {
@@ -120,7 +99,21 @@ func (o *OmamoriApp) logMessage(message string) {
 }
 
 func (o *OmamoriApp) saveConfig() {
-	// Validate and save the configuration
+	newConfig := &config.Config{
+		Upstream1: o.upstream1Entry.Text,
+		Upstream2: o.upstream2Entry.Text,
+		MapFile:   o.mapFileEntry.Text,
+	}
+
+	// TODO: currently for simplicity no option to update file paths
+	if !o.configChanged {
+		return
+	}
+	o.logMessage("Config changed. Sending update event...")
+	events.GlobalEventChannel <- events.Event{
+		Type:    events.UpdateConfig,
+		Payload: newConfig,
+	}
 }
 
 func (o *OmamoriApp) serverControlTab() *fyne.Container {
@@ -130,12 +123,10 @@ func (o *OmamoriApp) serverControlTab() *fyne.Container {
 	o.startStopButton = widget.NewButton("Start Server", o.toggleServer)
 	o.startStopButton.Importance = widget.HighImportance
 
-	testButton := widget.NewButton("Test DNS Query", o.testDNSQuery)
-
 	//Quick actions
 	quickActionsCard := widget.NewCard("Quick Actions", "",
 		container.NewVBox(
-			container.NewHBox(o.startStopButton, testButton),
+			container.NewHBox(o.startStopButton),
 		),
 	)
 
@@ -147,47 +138,63 @@ func (o *OmamoriApp) serverControlTab() *fyne.Container {
 	)
 }
 
+func (o *OmamoriApp) bindIPEntry(entry *widget.Entry, initial string) *widget.Entry {
+	entry.SetText(initial)
+	entry.OnChanged = func(input string) {
+		if net.ParseIP(input) == nil {
+			entry.SetValidationError(fmt.Errorf("invalid IP address"))
+			o.configChanged = false
+		} else {
+			entry.SetValidationError(nil)
+			o.configChanged = true
+		}
+	}
+	return entry
+}
+
+func (o *OmamoriApp) bindCheck(check *widget.Check, initialValue bool, onToggle func(bool)) *widget.Check {
+	check.SetChecked(initialValue)
+	check.OnChanged = func(val bool) {
+		o.configChanged = true
+		onToggle(val)
+	}
+	return check
+}
+
 func (o *OmamoriApp) configurationTab() *container.Scroll {
-	// upstream server
-	o.upstream1Entry = widget.NewEntry()
-	o.upstream1Entry.SetText(o.config.Upstream1)
+	// Upstream DNS entries
+	o.upstream1Entry = o.bindIPEntry(widget.NewEntry(), o.config.Upstream1)
+	o.upstream2Entry = o.bindIPEntry(widget.NewEntry(), o.config.Upstream2)
 
-	o.upstream2Entry = widget.NewEntry()
-	o.upstream2Entry.SetText(o.config.Upstream2)
+	// Map file path
+	o.mapFileEntry = widget.NewEntry()
+	o.mapFileEntry.SetText(o.config.MapFile)
 
-	o.portEntry = widget.NewEntry()
-	o.portEntry.SetText(strconv.Itoa(o.config.UdpServerPort))
-	portLabel := widget.NewLabel("Port:")
-	portHbox := container.NewBorder(nil, nil, portLabel, nil, o.portEntry)
-
-	// DoHS settings
-	o.certPathEntry = widget.NewEntry()
-	o.certPathEntry.SetText(o.config.CertPath)
-	certBrowseButton := widget.NewButton("Browse", func() {
+	mapFileBrowseButton := widget.NewButton("Browse", func() {
 		dialog.ShowFileOpen(func(reader fyne.URIReadCloser, err error) {
 			if err == nil && reader != nil {
-				o.certPathEntry.SetText(reader.URI().Path())
+				o.mapFileEntry.SetText(reader.URI().Path())
+				if o.config.MapFile != reader.URI().Path() {
+					o.configChanged = true
+				}
 				reader.Close()
 			}
 		}, o.window)
 	})
-	certHbox := container.NewBorder(nil, nil, nil, certBrowseButton, o.certPathEntry)
 
-	o.keyPathEntry = widget.NewEntry()
-	o.keyPathEntry.SetText(o.config.KeyPath)
-	keyBrowseButton := widget.NewButton("Browse", func() {
-		dialog.ShowFileOpen(func(reader fyne.URIReadCloser, err error) {
-			if err == nil && reader != nil {
-				o.keyPathEntry.SetText(reader.URI().Path())
-				reader.Close()
+	// DoHS checkbox (tracked separately too)
+	o.dohsCheck = o.bindCheck(
+		widget.NewCheck("Start DOHS", nil),
+		o.dohsEnabled,
+		func(enabled bool) {
+			if enabled {
+				events.GlobalEventChannel <- events.Event{Type: events.StartDOHServer}
+			} else {
+				events.GlobalEventChannel <- events.Event{Type: events.StopDOHServer}
 			}
-		}, o.window)
-	})
-	keyHbox := container.NewBorder(nil, nil, nil, keyBrowseButton, o.keyPathEntry)
-
-	o.dohsCheck = widget.NewCheck("Enable DoH Server", func(enabled bool) {
-		o.dohsEnabled = enabled
-	})
+			o.dohsEnabled = enabled
+		},
+	)
 
 	saveButton := widget.NewButton("Save Configuration", o.saveConfig)
 	saveButton.Importance = widget.HighImportance
@@ -197,15 +204,17 @@ func (o *OmamoriApp) configurationTab() *container.Scroll {
 			container.NewVBox(
 				widget.NewFormItem("Primary Upstream DNS", o.upstream1Entry).Widget,
 				widget.NewFormItem("Secondary Upstream DNS", o.upstream2Entry).Widget,
-				portHbox,
 			),
 		),
-		widget.NewCard("HTTPS / DoH Settings", "",
+		widget.NewCard("Site Map File", "",
 			container.NewVBox(
-				o.dohsCheck,
-				widget.NewFormItem("Certificate Path", certHbox).Widget,
-				widget.NewFormItem("Private Key Path", keyHbox).Widget,
+				widget.NewFormItem("Blocked Sites File",
+					container.NewBorder(nil, nil, nil, mapFileBrowseButton, o.mapFileEntry),
+				).Widget,
 			),
+		),
+		widget.NewCard("DOHS Settings", "",
+			container.NewVBox(o.dohsCheck),
 		),
 		container.NewHBox(layout.NewSpacer(), saveButton),
 	)
@@ -217,8 +226,7 @@ func (o *OmamoriApp) setup() {
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Server Control", o.serverControlTab()),
 		container.NewTabItem("Configuration", o.configurationTab()), //widget.NewLabel("Settings will be here soon!")),
-		container.NewTabItem("Blocked Sites", widget.NewLabel("Settings will be here soon!")),
-		container.NewTabItem("Custom DNS", widget.NewLabel("Settings will be here soon!")),
+		container.NewTabItem("Site map", widget.NewLabel("Settings will be here soon!")),
 		container.NewTabItem("Logs", widget.NewLabel("Settings will be here soon!")),
 	)
 
