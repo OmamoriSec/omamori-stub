@@ -26,6 +26,7 @@ type OmamoriApp struct {
 	startStopButton *widget.Button
 	blockedSites    []string
 	dohsEnabled     bool
+	siteListManager *SiteListManager
 
 	// Form fields
 	upstream1Entry *widget.Entry
@@ -57,6 +58,7 @@ func StartGUI() {
 	omamori.window.Resize(fyne.NewSize(800, 600))
 
 	omamori.config = config.Global
+	omamori.siteListManager = omamori.createSiteListManager()
 
 	omamori.setup()
 	omamori.window.ShowAndRun()
@@ -222,12 +224,25 @@ func (o *OmamoriApp) configurationTab() *container.Scroll {
 	return container.NewScroll(form)
 }
 
+func (o *OmamoriApp) siteListTab() *fyne.Container {
+	return o.siteListManager.createUI()
+}
+
+func (o *OmamoriApp) logTab() *fyne.Container {
+	// Placeholder for metrics
+	return container.NewVBox(
+		widget.NewCard("DNS Query / Event Logs", "Coming Soon",
+			widget.NewLabel("Logs will be displayed here"),
+		),
+	)
+}
+
 func (o *OmamoriApp) setup() {
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Server Control", o.serverControlTab()),
-		container.NewTabItem("Configuration", o.configurationTab()), //widget.NewLabel("Settings will be here soon!")),
-		container.NewTabItem("Site map", widget.NewLabel("Settings will be here soon!")),
-		container.NewTabItem("Logs", widget.NewLabel("Settings will be here soon!")),
+		container.NewTabItem("Configuration", o.configurationTab()),
+		container.NewTabItem("Site List", o.siteListTab()),
+		container.NewTabItem("Logs", o.logTab()),
 	)
 
 	statusBar := o.createStatusBar()
