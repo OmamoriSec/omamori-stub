@@ -312,11 +312,6 @@ func (s *SiteListManager) loadBlockedSites() {
 				if domain != "" && domain != "localhost" && !strings.Contains(domain, "localhost") {
 					s.blockedSites = append(s.blockedSites, domain)
 					count++
-
-					// Limit display to first 1000 entries for performance
-					if count >= 1000 {
-						break
-					}
 				}
 			}
 		}
@@ -371,7 +366,6 @@ func (s *SiteListManager) saveCustomBlockedSites() {
 func (s *SiteListManager) loadCustomDNS() {
 	// Load from map.txt (custom DNS mappings)
 	mapFile := s.app.config.ConfigDir + "/map.txt"
-	fmt.Printf(mapFile)
 	if file, err := os.Open(mapFile); err == nil {
 		defer file.Close()
 		scanner := bufio.NewScanner(file)
@@ -379,12 +373,13 @@ func (s *SiteListManager) loadCustomDNS() {
 			line := strings.TrimSpace(scanner.Text())
 			if line != "" && !strings.HasPrefix(line, "#") {
 				parts := strings.Fields(line)
-				if len(parts) >= 2 {
-					s.customDNS = append(s.customDNS, CustomDNSEntry{
-						Domain: parts[1],
-						IP:     parts[0],
-					})
+				if len(parts) >= 2 && (parts[0] == "0.0.0.0" || parts[0] == "::") {
+					continue
 				}
+				s.customDNS = append(s.customDNS, CustomDNSEntry{
+					Domain: parts[1],
+					IP:     parts[0],
+				})
 			}
 		}
 	}
