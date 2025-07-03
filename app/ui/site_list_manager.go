@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"omamori/app/core/events"
 )
 
 type SiteListManager struct {
@@ -34,6 +35,13 @@ type SiteListManager struct {
 type CustomDNSEntry struct {
 	Domain string
 	IP     string
+}
+
+type SiteData struct {
+	Operation string // "add" or "delete"
+	Domain    string // domain name
+	IP        string // IP address (for custom DNS)
+	Type      string // "blocked" or "custom_dns"
 }
 
 func (o *OmamoriApp) createSiteListManager() *SiteListManager {
@@ -203,6 +211,18 @@ func (s *SiteListManager) addBlockedSite() {
 	s.filterBlockedSites(s.searchEntry.Text)
 	s.blockDomainEntry.SetText("")
 
+	// Send event to update the radix tree and save to file
+	operation := SiteData{
+		Operation: "add",
+		Domain:    domain,
+		Type:      "blocked",
+	}
+
+	events.GlobalEventChannel <- events.Event{
+		Type:    events.UpdateSiteList,
+		Payload: operation,
+	}
+
 	s.app.logMessage(fmt.Sprintf("Added blocked domain: %s", domain))
 }
 
@@ -239,6 +259,19 @@ func (s *SiteListManager) addCustomDNS() {
 	s.dnsNameEntry.SetText("")
 	s.dnsIPEntry.SetText("")
 
+	// Send event to update the custom DNS mapping
+	operation := SiteData{
+		Operation: "add",
+		Domain:    domain,
+		IP:        ip,
+		Type:      "custom_dns",
+	}
+
+	events.GlobalEventChannel <- events.Event{
+		Type:    events.UpdateSiteList,
+		Payload: operation,
+	}
+
 	s.app.logMessage(fmt.Sprintf("Added custom DNS: %s -> %s", domain, ip))
 }
 
@@ -249,6 +282,18 @@ func (s *SiteListManager) removeBlockedSite(index int) {
 		// Update filtered list
 		s.filterBlockedSites(s.searchEntry.Text)
 
+		// Send event to update the radix tree and save to file
+		operation := SiteData{
+			Operation: "delete",
+			Domain:    domain,
+			Type:      "blocked",
+		}
+
+		events.GlobalEventChannel <- events.Event{
+			Type:    events.UpdateSiteList,
+			Payload: operation,
+		}
+
 		s.app.logMessage(fmt.Sprintf("Removed blocked domain: %s", domain))
 	}
 }
@@ -258,6 +303,19 @@ func (s *SiteListManager) removeCustomDNS(index int) {
 		entry := s.customDNS[index]
 		s.customDNS = append(s.customDNS[:index], s.customDNS[index+1:]...)
 		s.customDNSList.Refresh()
+
+		// Send event to update the custom DNS mapping
+		operation := SiteData{
+			Operation: "delete",
+			Domain:    entry.Domain,
+			IP:        entry.IP,
+			Type:      "custom_dns",
+		}
+
+		events.GlobalEventChannel <- events.Event{
+			Type:    events.UpdateSiteList,
+			Payload: operation,
+		}
 
 		s.app.logMessage(fmt.Sprintf("Removed custom DNS: %s -> %s", entry.Domain, entry.IP))
 	}

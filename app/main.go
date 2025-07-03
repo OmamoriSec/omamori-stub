@@ -164,9 +164,8 @@ func main() {
 					}
 				}
 
-			case events.UpdateSiteMap:
+			case events.UpdateSiteList:
 				log.Printf("Received update site map %v", event.Payload)
-
 			}
 		}
 	}()

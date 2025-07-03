@@ -8,7 +8,7 @@ const (
 	StartDOHServer EventType = "START_DOH_SERVER"
 	StopDOHServer  EventType = "STOP_DOH_SERVER"
 	UpdateConfig   EventType = "UPDATE_CONFIG"
-	UpdateSiteMap  EventType = "UPDATE_SITE_MAP"
+	UpdateSiteList EventType = "UPDATE_SITE_LIST"
 	Error          EventType = "ERROR"
 	Log            EventType = "LOG"
 )
