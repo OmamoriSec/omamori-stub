@@ -3,8 +3,8 @@ package dns
 import (
 	"log"
 	"net"
-	"omamori/app/internal/cache"
-	"omamori/app/internal/config"
+	"omamori/app/core/config"
+	"omamori/app/core/internal/cache"
 	"time"
 )
 

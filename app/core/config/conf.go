@@ -2,13 +2,15 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
-	"omamori/app/internal/radix"
+	"omamori/app/core/internal/radix"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -16,6 +18,8 @@ import (
 // =============== CONFIGURATIONS ===============
 
 var BlockedSites *radix.Tree
+
+const AppName = "omamori"
 
 type Config struct {
 	Upstream2     string `json:"upstream2"`
@@ -98,8 +102,10 @@ func LoadBlockedSites() error {
 	for site, ip := range siteList {
 		log.Printf("Site: %s, IP: %s", ReverseDomain(site), ip)
 	}
-	os.Exit(0)
+	return nil
+}
 
+func updateBlockedSites() error {
 	return nil
 }
 
@@ -162,34 +168,56 @@ func EnsureDefaultConfig() (*Config, error) {
 	}
 
 	// Create dir if it doesn't exist
-	if err := os.MkdirAll(Global.ConfigDir, 0700); err != nil {
+	if err := os.MkdirAll(fmt.Sprintf("%s/cert", Global.ConfigDir), 0700); err != nil {
 		return nil, err
 	}
 
-	// Write default config
-	defaultConfig := fmt.Sprintf(`{
-	    "upstream1": "%s",
-	    "upstream2": "%s",
-        "cert_path": "%s",
-        "key_path": "%s",
-        "port": %d,
-		"map_file": "%s"
-    }`, Global.Upstream1, Global.Upstream2, Global.CertPath, Global.KeyPath, Global.UdpServerPort, Global.MapFile)
+	// create certs for HTTP2
+	cmd := exec.Command("openssl", "req", "-newkey", "rsa:2048", "-nodes",
+		"-keyout", Global.KeyPath,
+		"-x509", "-days", "365",
+		"-out", Global.CertPath,
+		"-subj", "/O=Omamori/CN=localhost",
+	)
 
-	return Global, os.WriteFile(Global.ConfigFile, []byte(defaultConfig), 0600)
+	cmd.Stdout = io.Discard
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		log.Fatalf("OpenSSL failed: %v", err)
+	}
+
+	// Write default config
+	err := SaveConfig()
+	if err != nil {
+		return nil, err
+	}
+	return Global, nil
+}
+
+func SaveConfig() error {
+	configJson, err := json.MarshalIndent(Global, "", "    ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(Global.ConfigFile, configJson, 0600)
 }
 
 func NewConfig() *Config {
-	configDir := "/etc/omamori"
-	configFile := filepath.Join(configDir, "config.json")
-	mapFile := filepath.Join(configDir, "map.txt")
+	rootConfigDir, err := os.UserConfigDir()
+	if err != nil {
+		log.Fatalf("Error: Fetching Config Directory: %v\n", err)
+	}
 
-	const (
-		upstream1 = "1.1.1.1"
-		upstream2 = "208.67.220.220"
-		certPath  = "/etc/omamori/cert/server.crt"
-		keyPath   = "/etc/omamori/cert/server.key"
-		port      = 2053
+	var (
+		configDir  = filepath.Join(rootConfigDir, AppName)
+		configFile = filepath.Join(configDir, "config.json")
+		mapFile    = filepath.Join(configDir, "map.txt")
+		certPath   = filepath.Join(configDir, "cert", "server.crt")
+		keyPath    = filepath.Join(configDir, "cert", "server.key")
+		upstream1  = "1.1.1.1"
+		upstream2  = "208.67.220.220"
+		port       = 53
 	)
 
 	return &Config{
@@ -202,4 +230,27 @@ func NewConfig() *Config {
 		ConfigFile:    configFile,
 		ConfigDir:     configDir,
 	}
+}
+
+func UpdateConfig(config *Config) error {
+
+	if !(isValidIP(config.Upstream2) && isValidIP(config.Upstream1)) {
+		return errors.New("upstream2 or upstream1 are not valid")
+	}
+
+	if _, err := os.Stat(config.MapFile); err != nil {
+		return err
+	}
+
+	Global.Upstream2 = config.Upstream2
+	Global.Upstream1 = config.Upstream1
+
+	Global.MapFile = config.MapFile
+
+	// update the config file
+	if err := SaveConfig(); err != nil {
+		return err
+	}
+
+	return nil
 }
