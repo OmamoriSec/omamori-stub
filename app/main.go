@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"omamori/app/core/channels"
 	"omamori/app/core/config"
 	"omamori/app/core/dns"
-	"omamori/app/core/events"
 	"omamori/app/dohs"
 	"omamori/app/ui"
 	"time"
@@ -57,7 +57,7 @@ func handleDNSRequest(ctx context.Context, port int) {
 	if err != nil {
 		log.Println("Failed to start UDP server:", err)
 		// send the error into the event channel
-		events.GlobalEventChannel <- events.Event{Type: events.Error, Payload: err}
+		channels.GlobalEventChannel <- channels.Event{Type: channels.Error, Payload: err}
 		return
 	}
 
@@ -116,45 +116,53 @@ func main() {
 	var dohCancel context.CancelFunc
 
 	go func() {
-		for event := range events.GlobalEventChannel {
+		for event := range channels.GlobalEventChannel {
 			switch event.Type {
-			case events.StartDnsServer:
+			case channels.StartDnsServer:
 				// port argument is there for future extensibility
 				if dnsCancel != nil {
 					continue
 				}
 				dnsCtx, dnsCancel = context.WithCancel(context.Background())
 				go handleDNSRequest(dnsCtx, configData.UdpServerPort)
-			case events.StopDnsServer:
+			case channels.StopDnsServer:
 				if dnsCancel != nil {
 					dnsCancel()
 					dnsCancel = nil
 				}
-			case events.StartDOHServer:
+			case channels.StartDOHServer:
 				if dohCancel != nil {
 					continue
 				}
 				dohCtx, dohCancel = context.WithCancel(context.Background())
 				go dohs.RunHttpServer(dohCtx)
-			case events.StopDOHServer:
+			case channels.StopDOHServer:
 				if dohCancel != nil {
 					dohCancel()
 					dohCancel = nil
 				}
-			case events.UpdateConfig:
+			case channels.UpdateConfig:
 				newConfig, ok := event.Payload.(*config.Config)
 				if ok {
 					err := config.UpdateConfig(newConfig)
 					if err != nil {
 						log.Println("Failed to save config:", err)
-						events.GlobalEventChannel <- events.Event{
-							Type: events.Error, Payload: err,
+						channels.GlobalEventChannel <- channels.Event{
+							Type: channels.Error, Payload: err,
 						}
 					}
 				}
 
-			case events.UpdateSiteList:
+			case channels.UpdateSiteList:
 				log.Printf("Received update site map %v", event.Payload)
+				payload := event.Payload.(map[string]interface{})
+				err := config.UpdateSiteList(payload["operation"].(string), payload["siteData"].(config.SiteData))
+				if err != nil {
+					log.Println("Failed to update site list:", err)
+					channels.GlobalEventChannel <- channels.Event{
+						Type: channels.Error, Payload: err,
+					}
+				}
 			}
 		}
 	}()

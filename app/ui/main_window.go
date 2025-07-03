@@ -9,6 +9,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"log"
+	"omamori/app/core/channels"
 	"omamori/app/core/config"
 	"time"
 )
@@ -74,6 +75,19 @@ func StartGUI() {
 	omamori.configManager = omamori.createConfigManager()
 	omamori.siteListManager = omamori.createSiteListManager()
 	omamori.logManager = omamori.createLogManager()
+
+	go func() {
+		for data := range channels.LogEventChannel {
+			payload, ok := data.Payload.(string)
+			if !ok {
+				continue
+			}
+
+			fyne.Do(func() {
+				omamori.logManager.AppendLog(payload)
+			})
+		}
+	}()
 
 	omamori.setup()
 	omamori.window.ShowAndRun()

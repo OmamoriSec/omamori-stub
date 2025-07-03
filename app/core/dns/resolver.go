@@ -1,8 +1,10 @@
 package dns
 
 import (
+	"fmt"
 	"log"
 	"net"
+	"omamori/app/core/channels"
 	"omamori/app/core/config"
 	"omamori/app/core/internal/cache"
 	"time"
@@ -48,7 +50,10 @@ func Lookup(dnsQuery *Query) *Query {
 	dnsQuery.Answer = []*Answer{defaultAnswer}
 
 	if !resolveable(dnsQuery.Questions.Name) {
-		log.Printf("%s is not resolvable\n", dnsQuery.Questions.Name)
+		channels.LogEventChannel <- channels.Event{
+			Type:    channels.Log,
+			Payload: fmt.Sprintf("%s -> %s", dnsQuery.Questions.Name, dnsQuery.Questions.Name),
+		}
 		return dnsQuery
 	}
 
@@ -73,7 +78,10 @@ func Lookup(dnsQuery *Query) *Query {
 		dnsQuery.Answer = []*Answer{cachedAnswer}
 		dnsQuery.Header.ANCOUNT = 1
 
-		log.Printf("Cache hit for %s\n", dnsQuery.Questions.Name)
+		channels.LogEventChannel <- channels.Event{
+			Type:    channels.Log,
+			Payload: fmt.Sprintf("Cache hit for %s\n", dnsQuery.Questions.Name),
+		}
 		return dnsQuery
 	}
 
