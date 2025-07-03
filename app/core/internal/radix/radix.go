@@ -75,6 +75,76 @@ func (node *Node) insert(word string, data string) {
 	currNode.data = data
 }
 
+func (node *Node) delete(word string) bool {
+	return node.deleteHelper(word, 0)
+}
+
+func (node *Node) deleteHelper(word string, depth int) bool {
+	if depth == len(word) {
+		// We've reached the end of the word
+		if !node.endOfWord {
+			return false // Word doesn't exist
+		}
+		node.endOfWord = false
+		node.data = ""
+
+		// If node has no children, it can be deleted
+		return !node.hasChildren()
+	}
+
+	// Find the child that matches the remaining word
+	remainingWord := word[depth:]
+	var matchedKey string
+	var matchedChild *Node
+
+	for key, child := range node.children {
+		if strings.HasPrefix(remainingWord, key) {
+			matchedKey = key
+			matchedChild = child
+			break
+		}
+	}
+
+	if matchedChild == nil {
+		return false // Word doesn't exist
+	}
+
+	// Recursively delete from the child
+	shouldDeleteChild := matchedChild.deleteHelper(word, depth+len(matchedKey))
+
+	if shouldDeleteChild {
+		delete(node.children, matchedKey)
+
+		// If this node has no children after deletion and is not end of word, it can be deleted
+		if !node.hasChildren() && !node.endOfWord {
+			return true
+		}
+
+		// If this node has exactly one child and is not end of word, merge with child
+		if len(node.children) == 1 && !node.endOfWord {
+			// Get the single child
+			for childKey, child := range node.children {
+				// Merge: replace this node's children with merged key
+				delete(node.children, childKey)
+
+				// Add all grandchildren with merged keys
+				for grandchildKey, grandchild := range child.children {
+					node.addChild(childKey+grandchildKey, grandchild)
+				}
+
+				// If child was end of word, make this node end of word
+				if child.endOfWord {
+					node.endOfWord = true
+					node.data = child.data
+				}
+				break
+			}
+		}
+	}
+
+	return false
+}
+
 func (node *Node) search(word string) bool {
 	currNode := node
 	for len(word) > 0 {
@@ -132,6 +202,10 @@ func (tree *Tree) GetItems() map[string]string {
 	tree.root.getItems(&items, "")
 	return items
 
+}
+
+func (tree *Tree) Delete(word string) bool {
+	return tree.root.delete(word)
 }
 
 func NewRadixTree() *Tree {

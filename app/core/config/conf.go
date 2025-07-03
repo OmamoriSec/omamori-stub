@@ -102,16 +102,41 @@ func LoadBlockedSites() error {
 			BlockedSites.Insert(ReverseDomain(domain), strings.TrimSpace(entry[:spaceIndex]))
 		}
 	}
+	return nil
+}
 
-	siteList := BlockedSites.GetItems()
-	for site, ip := range siteList {
-		log.Printf("Site: %s, IP: %s", ReverseDomain(site), ip)
+func UpdateSiteMap(operation string, siteData *SiteData) error {
+
+	f, err := os.OpenFile(Global.MapFile, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return err
+	}
+	defer func(f *os.File) {
+		err := f.Close()
+		if err != nil {
+		}
+	}(f)
+
+	switch operation {
+	case "add":
+		log.Printf("Adding site: %s", siteData.Domain)
+		BlockedSites.Insert(ReverseDomain(siteData.Domain), siteData.IP)
+		_, _ = f.Write([]byte(fmt.Sprintf("%s %s", siteData.IP, siteData.Domain) + "\n"))
+	case "delete":
+		log.Printf("Deleting site: %s", siteData.Domain)
+		BlockedSites.Delete(ReverseDomain(siteData.Domain))
+
 	}
 	return nil
 }
 
-func updateBlockedSites() error {
-	return nil
+func ListSiteMap() []*SiteData {
+	siteMapList := make([]*SiteData, 0)
+	for domain, ip := range BlockedSites.GetItems() {
+		siteMapList = append(siteMapList, &SiteData{Domain: ReverseDomain(domain), IP: ip})
+	}
+
+	return siteMapList
 }
 
 func ReverseDomain(domain string) string {
