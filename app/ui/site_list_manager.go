@@ -1,11 +1,9 @@
 package ui
 
 import (
-	"bufio"
 	"fmt"
 	"net"
 	"omamori/app/core/config"
-	"os"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -63,7 +61,7 @@ func (s *SiteListManager) setupUI() {
 	s.dnsNameEntry.SetPlaceHolder("Domain name (e.g., myserver.local)")
 
 	s.dnsIPEntry = widget.NewEntry()
-	s.dnsIPEntry.SetPlaceHolder("IP address (e.g., 192.168.1.100)")
+	s.dnsIPEntry.SetPlaceHolder("IP address")
 
 	// Search field for blocked domains
 	s.searchEntry = widget.NewEntry()
@@ -210,6 +208,7 @@ func (s *SiteListManager) addBlockedSite() {
 	// Send event to update the radix tree and save to file
 	siteUpdatePayload["operation"] = "add"
 	siteUpdatePayload["siteData"] = config.SiteData{
+		IP:     "0.0.0.0",
 		Domain: domain,
 	}
 
@@ -335,78 +334,31 @@ func (s *SiteListManager) isValidDomain(domain string) bool {
 
 func (s *SiteListManager) loadBlockedSites() {
 	// Load from the main blocked file (StevenBlack hosts list)
-	blockedFilePath := s.app.config.MapFile
+	blockedFileList := config.ListSiteMap()
 
-	if file, err := os.Open(blockedFilePath); err == nil {
-		defer file.Close()
-		scanner := bufio.NewScanner(file)
-		count := 0
-
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if line == "" || strings.HasPrefix(line, "#") {
-				continue
-			}
-
-			// Parse hosts file format: IP domain
-			spaceIndex := strings.Index(line, " ")
-			if spaceIndex != -1 {
-				domain := strings.TrimSpace(line[spaceIndex+1:])
-				// Remove any additional comments
-				if commentIndex := strings.Index(domain, " "); commentIndex != -1 {
-					domain = strings.TrimSpace(domain[:commentIndex])
-				}
-
-				if domain != "" && domain != "localhost" && !strings.Contains(domain, "localhost") {
-					s.blockedSites = append(s.blockedSites, domain)
-					count++
-				}
-			}
-		}
-
-		s.app.logMessage(fmt.Sprintf("Loaded %d blocked domains from %s", count, blockedFilePath))
-	} else {
-		s.app.logMessage(fmt.Sprintf("Could not load blocked sites from %s: %v", blockedFilePath, err))
-	}
-
-	// Also load custom blocked sites
-	s.loadCustomBlockedSites()
-}
-
-func (s *SiteListManager) loadCustomBlockedSites() {
-	// Load additional custom blocked sites
-	customBlockedFile := s.app.config.ConfigDir + "/map.txt"
-	if file, err := os.Open(customBlockedFile); err == nil {
-		defer file.Close()
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if line != "" && !strings.HasPrefix(line, "#") {
-				s.blockedSites = append(s.blockedSites, line)
-			}
+	for i := 0; i < len(blockedFileList); i++ {
+		line := blockedFileList[i]
+		if line.IP == "0.0.0.0" || line.IP == "::" {
+			s.blockedSites = append(s.blockedSites, line.Domain)
 		}
 	}
+
+	s.app.logMessage(fmt.Sprintf("Loaded %d blocked domains from %s", len(s.blockedSites), s.app.config.MapFile))
 }
 
 func (s *SiteListManager) loadCustomDNS() {
 	// Load from map.txt (custom DNS mappings)
-	mapFile := s.app.config.ConfigDir + "/map.txt"
-	if file, err := os.Open(mapFile); err == nil {
-		defer file.Close()
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if line != "" && !strings.HasPrefix(line, "#") {
-				parts := strings.Fields(line)
-				if len(parts) >= 2 && (parts[0] == "0.0.0.0" || parts[0] == "::") {
-					continue
-				}
-				s.customDNS = append(s.customDNS, CustomDNSEntry{
-					Domain: parts[1],
-					IP:     parts[0],
-				})
-			}
+	fileList := config.ListSiteMap()
+
+	for i := 0; i < len(fileList); i++ {
+		line := fileList[i]
+		if line.IP == "0.0.0.0" || line.IP == "::" {
+			continue
 		}
+		s.customDNS = append(s.customDNS, CustomDNSEntry{
+			Domain: line.Domain,
+			IP:     line.IP,
+		})
 	}
 }
 
@@ -421,7 +373,7 @@ func (s *SiteListManager) blockDNSTab() *fyne.Container {
 	searchContainer := container.NewBorder(nil, nil, widget.NewIcon(theme.SearchIcon()), nil, s.searchEntry)
 
 	blockedScrollContainer := container.NewScroll(s.blockedList)
-	blockedScrollContainer.SetMinSize(fyne.NewSize(400, 200))
+	blockedScrollContainer.SetMinSize(fyne.NewSize(400, 400))
 
 	statsLabel := widget.NewLabel(fmt.Sprintf("Total Blocked Domains: %d", len(s.blockedSites)))
 	statsLabel.Importance = widget.MediumImportance
@@ -444,24 +396,45 @@ func (s *SiteListManager) blockDNSTab() *fyne.Container {
 func (s *SiteListManager) customDNSTab() *fyne.Container {
 	addDNSButton := widget.NewButton("Add DNS Entry", s.addCustomDNS)
 	addDNSButton.Importance = widget.HighImportance
-
-	dnsInputContainer := container.NewBorder(nil, nil, nil, addDNSButton,
-		container.NewBorder(nil, nil,
-			container.NewHBox(s.dnsNameEntry, widget.NewLabel("→")),
-			nil,
-			s.dnsIPEntry,
-		),
+	// Set explicit minimum sizes for better control
+	s.dnsNameEntry.Resize(fyne.NewSize(300, 0)) // Make domain field much wider
+	// Create a custom container with manual positioning
+	inputContainer := container.NewWithoutLayout(
+		s.dnsNameEntry,
+		container.NewHBox(widget.NewLabel("→")),
+		s.dnsIPEntry,
+		addDNSButton,
 	)
 
+	// Position elements manually for precise control
+	inputContainer.Add(s.dnsNameEntry)
+	s.dnsNameEntry.Move(fyne.NewPos(0, 0))
+	s.dnsNameEntry.Resize(fyne.NewSize(300, 40))
+
+	arrowLabel := widget.NewLabel("→")
+	inputContainer.Add(arrowLabel)
+	arrowLabel.Move(fyne.NewPos(300, 5))
+
+	inputContainer.Add(s.dnsIPEntry)
+	s.dnsIPEntry.Move(fyne.NewPos(330, 0))
+	s.dnsIPEntry.Resize(fyne.NewSize(200, 40))
+
+	inputContainer.Add(addDNSButton)
+	addDNSButton.Move(fyne.NewPos(540, 0))
+	addDNSButton.Resize(fyne.NewSize(120, 40))
+
+	// Set container size
+	inputContainer.Resize(fyne.NewSize(670, 50))
+
 	customDNSScrollContainer := container.NewScroll(s.customDNSList)
-	customDNSScrollContainer.SetMinSize(fyne.NewSize(400, 1500))
+	customDNSScrollContainer.SetMinSize(fyne.NewSize(400, 400))
 
 	statsLabel := widget.NewLabel(fmt.Sprintf("Custom DNS Entries: %d", len(s.customDNS)))
 	statsLabel.Importance = widget.MediumImportance
 
 	customDNSCard := widget.NewCard("Custom DNS Mappings", "Map domains to specific IP addresses",
 		container.NewVBox(
-			dnsInputContainer,
+			inputContainer,
 			customDNSScrollContainer,
 		),
 	)

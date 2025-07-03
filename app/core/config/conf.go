@@ -105,7 +105,7 @@ func LoadBlockedSites() error {
 	return nil
 }
 
-func UpdateSiteMap(operation string, siteData *SiteData) error {
+func UpdateSiteList(operation string, siteData SiteData) error {
 
 	f, err := os.OpenFile(Global.MapFile, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
