@@ -111,20 +111,25 @@ func UpdateSiteMap(operation string, siteData *SiteData) error {
 	if err != nil {
 		return err
 	}
-	defer func(f *os.File) {
-		err := f.Close()
-		if err != nil {
-		}
-	}(f)
 
 	switch operation {
 	case "add":
 		log.Printf("Adding site: %s", siteData.Domain)
 		BlockedSites.Insert(ReverseDomain(siteData.Domain), siteData.IP)
 		_, _ = f.Write([]byte(fmt.Sprintf("%s %s", siteData.IP, siteData.Domain) + "\n"))
+		_ = f.Close()
 	case "delete":
 		log.Printf("Deleting site: %s", siteData.Domain)
 		BlockedSites.Delete(ReverseDomain(siteData.Domain))
+
+		f, err := os.OpenFile(Global.MapFile, os.O_WRONLY|os.O_TRUNC, 0600)
+		if err != nil {
+			return err
+		}
+		for domain, ip := range BlockedSites.GetItems() {
+			_, _ = f.Write([]byte(fmt.Sprintf("%s %s", ip, ReverseDomain(domain)) + "\n"))
+		}
+		_ = f.Close()
 
 	}
 	return nil
