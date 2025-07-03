@@ -202,7 +202,6 @@ func (s *SiteListManager) addBlockedSite() {
 	// Update filtered list
 	s.filterBlockedSites(s.searchEntry.Text)
 	s.blockDomainEntry.SetText("")
-	s.saveCustomBlockedSites()
 
 	s.app.logMessage(fmt.Sprintf("Added blocked domain: %s", domain))
 }
@@ -239,7 +238,6 @@ func (s *SiteListManager) addCustomDNS() {
 	s.customDNSList.Refresh()
 	s.dnsNameEntry.SetText("")
 	s.dnsIPEntry.SetText("")
-	s.saveCustomDNS()
 
 	s.app.logMessage(fmt.Sprintf("Added custom DNS: %s -> %s", domain, ip))
 }
@@ -250,7 +248,7 @@ func (s *SiteListManager) removeBlockedSite(index int) {
 		s.blockedSites = append(s.blockedSites[:index], s.blockedSites[index+1:]...)
 		// Update filtered list
 		s.filterBlockedSites(s.searchEntry.Text)
-		s.saveCustomBlockedSites()
+
 		s.app.logMessage(fmt.Sprintf("Removed blocked domain: %s", domain))
 	}
 }
@@ -260,7 +258,7 @@ func (s *SiteListManager) removeCustomDNS(index int) {
 		entry := s.customDNS[index]
 		s.customDNS = append(s.customDNS[:index], s.customDNS[index+1:]...)
 		s.customDNSList.Refresh()
-		s.saveCustomDNS()
+
 		s.app.logMessage(fmt.Sprintf("Removed custom DNS: %s -> %s", entry.Domain, entry.IP))
 	}
 }
@@ -327,7 +325,7 @@ func (s *SiteListManager) loadBlockedSites() {
 
 func (s *SiteListManager) loadCustomBlockedSites() {
 	// Load additional custom blocked sites
-	customBlockedFile := s.app.config.ConfigDir + "/blocked.txt"
+	customBlockedFile := s.app.config.ConfigDir + "/map.txt"
 	if file, err := os.Open(customBlockedFile); err == nil {
 		defer file.Close()
 		scanner := bufio.NewScanner(file)
@@ -336,29 +334,6 @@ func (s *SiteListManager) loadCustomBlockedSites() {
 			if line != "" && !strings.HasPrefix(line, "#") {
 				s.blockedSites = append(s.blockedSites, line)
 			}
-		}
-	}
-}
-
-func (s *SiteListManager) saveCustomBlockedSites() {
-	customBlockedFile := s.app.config.ConfigDir + "/blocked.txt"
-
-	os.MkdirAll(s.app.config.ConfigDir, 0755)
-
-	file, err := os.Create(customBlockedFile)
-	if err != nil {
-		s.app.logMessage(fmt.Sprintf("Error saving custom blocked sites: %v", err))
-		return
-	}
-	defer file.Close()
-
-	file.WriteString("# Custom blocked domains (added via GUI)\n")
-	// Only save domains that are not from the main blocked list
-	// For now, saving all custom additions here
-	for _, domain := range s.blockedSites {
-		// TODO! @jiisanda simiplified approach - will have to track which domain are custom vs from the main list
-		if !strings.Contains(domain, "doubleclick") && !strings.Contains(domain, "googleads") {
-			file.WriteString(domain + "\n")
 		}
 	}
 }
@@ -382,24 +357,6 @@ func (s *SiteListManager) loadCustomDNS() {
 				})
 			}
 		}
-	}
-}
-
-func (s *SiteListManager) saveCustomDNS() {
-	mapFile := s.app.config.ConfigDir + "/map.txt"
-
-	os.MkdirAll(s.app.config.ConfigDir, 0755)
-
-	file, err := os.Create(mapFile)
-	if err != nil {
-		s.app.logMessage(fmt.Sprintf("Error saving custom DNS entries: %v", err))
-		return
-	}
-	defer file.Close()
-
-	file.WriteString("# Custom DNS entries (IP Domain)\n")
-	for _, entry := range s.customDNS {
-		file.WriteString(fmt.Sprintf("%s %s\n", entry.IP, entry.Domain))
 	}
 }
 
@@ -458,4 +415,8 @@ func (s *SiteListManager) createUI() *fyne.Container {
 		customDNSCard,
 		blockedSitesCard,
 	)
+}
+
+func (s *SiteListManager) siteListTab() *fyne.Container {
+	return s.createUI()
 }
