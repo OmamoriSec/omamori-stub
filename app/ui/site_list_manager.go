@@ -11,7 +11,7 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"omamori/app/core/events"
+	"omamori/app/core/channels"
 )
 
 type SiteListManager struct {
@@ -212,8 +212,8 @@ func (s *SiteListManager) addBlockedSite() {
 		Domain: domain,
 	}
 
-	events.GlobalEventChannel <- events.Event{
-		Type:    events.UpdateSiteList,
+	channels.GlobalEventChannel <- channels.Event{
+		Type:    channels.UpdateSiteList,
 		Payload: siteUpdatePayload,
 	}
 
@@ -260,8 +260,8 @@ func (s *SiteListManager) addCustomDNS() {
 		IP:     ip,
 	}
 
-	events.GlobalEventChannel <- events.Event{
-		Type:    events.UpdateSiteList,
+	channels.GlobalEventChannel <- channels.Event{
+		Type:    channels.UpdateSiteList,
 		Payload: siteUpdatePayload,
 	}
 
@@ -281,8 +281,8 @@ func (s *SiteListManager) removeBlockedSite(index int) {
 			Domain: domain,
 		}
 
-		events.GlobalEventChannel <- events.Event{
-			Type:    events.UpdateSiteList,
+		channels.GlobalEventChannel <- channels.Event{
+			Type:    channels.UpdateSiteList,
 			Payload: siteUpdatePayload,
 		}
 
@@ -303,8 +303,8 @@ func (s *SiteListManager) removeCustomDNS(index int) {
 			IP:     entry.IP,
 		}
 
-		events.GlobalEventChannel <- events.Event{
-			Type:    events.UpdateSiteList,
+		channels.GlobalEventChannel <- channels.Event{
+			Type:    channels.UpdateSiteList,
 			Payload: siteUpdatePayload,
 		}
 

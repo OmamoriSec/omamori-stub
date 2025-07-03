@@ -8,8 +8,8 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 	"net"
+	"omamori/app/core/channels"
 	"omamori/app/core/config"
-	"omamori/app/core/events"
 )
 
 type ConfigManager struct {
@@ -62,8 +62,8 @@ func (c *ConfigManager) saveConfig() {
 		return
 	}
 	c.app.logMessage("Config changed. Sending update event...")
-	events.GlobalEventChannel <- events.Event{
-		Type:    events.UpdateConfig,
+	channels.GlobalEventChannel <- channels.Event{
+		Type:    channels.UpdateConfig,
 		Payload: newConfig,
 	}
 }
@@ -95,9 +95,9 @@ func (c *ConfigManager) configurationTab() *container.Scroll {
 		c.app.serverManager.dohsEnabled,
 		func(enabled bool) {
 			if enabled {
-				events.GlobalEventChannel <- events.Event{Type: events.StartDOHServer}
+				channels.GlobalEventChannel <- channels.Event{Type: channels.StartDOHServer}
 			} else {
-				events.GlobalEventChannel <- events.Event{Type: events.StopDOHServer}
+				channels.GlobalEventChannel <- channels.Event{Type: channels.StopDOHServer}
 			}
 			c.app.serverManager.dohsEnabled = enabled
 		},

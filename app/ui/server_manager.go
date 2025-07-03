@@ -4,7 +4,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
-	"omamori/app/core/events"
+	"omamori/app/core/channels"
 	"strconv"
 )
 
@@ -38,11 +38,11 @@ func (s *ServerManager) startServer() {
 	s.startStopButton.Refresh()
 
 	s.app.logMessage("Starting DNS server on port " + strconv.Itoa(s.app.config.UdpServerPort))
-	events.GlobalEventChannel <- events.Event{Type: events.StartDnsServer}
+	channels.GlobalEventChannel <- channels.Event{Type: channels.StartDnsServer}
 }
 
 func (s *ServerManager) stopServer() {
-	events.GlobalEventChannel <- events.Event{Type: events.StopDnsServer}
+	channels.GlobalEventChannel <- channels.Event{Type: channels.StopDnsServer}
 	s.app.serverRunning = false
 	s.app.statusLabel.SetText("Server Status: Stopped")
 	s.startStopButton.SetText("Start Server")
