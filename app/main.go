@@ -7,7 +7,6 @@ import (
 	"omamori/app/dohs"
 	"omamori/app/internal/config"
 	"omamori/app/internal/dns"
-	"time"
 )
 
 func writeResp(udpConn *net.UDPConn, resp []byte, addr *net.UDPAddr) {
@@ -18,27 +17,16 @@ func writeResp(udpConn *net.UDPConn, resp []byte, addr *net.UDPAddr) {
 
 }
 
-func loadConf(refreshAfter int, continuous ...bool) {
-	isContinuous := false
-	if len(continuous) > 0 {
-		isContinuous = continuous[0]
+func loadConf() {
+
+	if err := config.LoadBlockedSites(); err != nil {
+		log.Println("Failed to reload blocked sites:", err)
 	}
 
-	for {
-		if err := config.LoadBlockedSites(); err != nil {
-			log.Println("Failed to reload blocked sites:", err)
-		}
-
-		if err := config.LoadConfig(); err != nil {
-			log.Println("Failed to reload upstream conf:", err)
-		}
-
-		if !isContinuous {
-			break
-		}
-
-		time.Sleep(time.Duration(refreshAfter) * time.Second)
+	if err := config.LoadConfig(); err != nil {
+		log.Println("Failed to reload upstream conf:", err)
 	}
+
 }
 
 func handleDNSRequest(udpConn *net.UDPConn) {
@@ -77,7 +65,7 @@ func main() {
 	}
 
 	//  Load blocked sites and conf
-	loadConf(0)
+	loadConf()
 
 	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("127.0.0.1:%d", configData.UdpServerPort))
 	if err != nil {
@@ -99,9 +87,6 @@ func main() {
 			log.Println("Failed to close UDP connection:", err)
 		}
 	}(udpConn)
-
-	//  Load blocked sites and conf continuously
-	go loadConf(15, true)
 
 	go dohs.RunHttpServer()
 

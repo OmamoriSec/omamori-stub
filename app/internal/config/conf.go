@@ -73,24 +73,32 @@ func LoadBlockedSites() error {
 	lines := strings.Split(string(data), "\n")
 
 	for _, line := range lines {
-		domain := strings.TrimSpace(line)
+		entry := strings.TrimSpace(line)
 
-		if domain == "" || strings.HasPrefix(domain, "#") {
+		if entry == "" || strings.HasPrefix(entry, "#") {
 			continue
 		}
 
-		spaceIndex := strings.Index(domain, " ")
+		var domain string
+
+		spaceIndex := strings.Index(entry, " ")
 		if spaceIndex != -1 {
-			endIndex := strings.Index(domain[spaceIndex+1:], " ")
+			endIndex := strings.Index(entry[spaceIndex+1:], " ")
 			if endIndex == -1 {
 				// there is no extra comment or space after the domain name
 				domain = strings.TrimSpace(line[spaceIndex+1:])
 			} else {
-				domain = strings.TrimSpace(domain[spaceIndex+1 : endIndex])
+				domain = strings.TrimSpace(entry[spaceIndex+1 : endIndex])
 			}
-			BlockedSites.Insert(ReverseDomain(domain))
+			BlockedSites.Insert(ReverseDomain(domain), strings.TrimSpace(entry[:spaceIndex]))
 		}
 	}
+
+	siteList := BlockedSites.GetItems()
+	for site, ip := range siteList {
+		log.Printf("Site: %s, IP: %s", ReverseDomain(site), ip)
+	}
+	os.Exit(0)
 
 	return nil
 }

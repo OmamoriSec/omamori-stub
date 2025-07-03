@@ -9,12 +9,14 @@ import (
 type Node struct {
 	children  map[string]*Node
 	endOfWord bool
+	data      string
 }
 
 func NewRadixNode() *Node {
 	return &Node{
 		endOfWord: false,
 		children:  nil,
+		data:      "",
 	}
 }
 
@@ -29,7 +31,7 @@ func (node *Node) hasChildren() bool {
 	return node.children != nil && len(node.children) > 0
 }
 
-func (node *Node) insert(word string) {
+func (node *Node) insert(word string, data string) {
 	currNode := node
 
 	for len(word) > 0 {
@@ -70,6 +72,7 @@ func (node *Node) insert(word string) {
 		}
 	}
 	currNode.endOfWord = true
+	currNode.data = data
 }
 
 func (node *Node) search(word string) bool {
@@ -99,12 +102,15 @@ func (node *Node) commonPrefixLength(word1 string, word2 string) int {
 	return i
 }
 
-func (node *Node) countNodes() int {
-	count := 1
-	for _, child := range node.children {
-		count += child.countNodes()
+func (node *Node) getItems(items *map[string]string, currKey string) {
+	// return all the items from the specific node
+	if node.endOfWord {
+		(*items)[currKey] = node.data
 	}
-	return count
+
+	for edge, child := range node.children {
+		child.getItems(items, currKey+edge)
+	}
 }
 
 // Radix Tree Methods //
@@ -113,12 +119,19 @@ type Tree struct {
 	root *Node
 }
 
-func (tree *Tree) Insert(word string) {
-	tree.root.insert(word)
+func (tree *Tree) Insert(word string, data string) {
+	tree.root.insert(word, data)
 }
 
 func (tree *Tree) Search(word string) bool {
 	return tree.root.search(word)
+}
+
+func (tree *Tree) GetItems() map[string]string {
+	items := make(map[string]string)
+	tree.root.getItems(&items, "")
+	return items
+
 }
 
 func NewRadixTree() *Tree {
