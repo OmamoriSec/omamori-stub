@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"omamori/app/core/config"
 	"os"
 	"strings"
 
@@ -37,12 +38,7 @@ type CustomDNSEntry struct {
 	IP     string
 }
 
-type SiteData struct {
-	Operation string // "add" or "delete"
-	Domain    string // domain name
-	IP        string // IP address (for custom DNS)
-	Type      string // "blocked" or "custom_dns"
-}
+var siteUpdatePayload = make(map[string]interface{}) // Global payload for site updates keys: [operation, siteData]
 
 func (o *OmamoriApp) createSiteListManager() *SiteListManager {
 	manager := &SiteListManager{
@@ -212,15 +208,14 @@ func (s *SiteListManager) addBlockedSite() {
 	s.blockDomainEntry.SetText("")
 
 	// Send event to update the radix tree and save to file
-	operation := SiteData{
-		Operation: "add",
-		Domain:    domain,
-		Type:      "blocked",
+	siteUpdatePayload["operation"] = "add"
+	siteUpdatePayload["siteData"] = config.SiteData{
+		Domain: domain,
 	}
 
 	events.GlobalEventChannel <- events.Event{
 		Type:    events.UpdateSiteList,
-		Payload: operation,
+		Payload: siteUpdatePayload,
 	}
 
 	s.app.logMessage(fmt.Sprintf("Added blocked domain: %s", domain))
@@ -260,16 +255,15 @@ func (s *SiteListManager) addCustomDNS() {
 	s.dnsIPEntry.SetText("")
 
 	// Send event to update the custom DNS mapping
-	operation := SiteData{
-		Operation: "add",
-		Domain:    domain,
-		IP:        ip,
-		Type:      "custom_dns",
+	siteUpdatePayload["operation"] = "add"
+	siteUpdatePayload["siteData"] = config.SiteData{
+		Domain: domain,
+		IP:     ip,
 	}
 
 	events.GlobalEventChannel <- events.Event{
 		Type:    events.UpdateSiteList,
-		Payload: operation,
+		Payload: siteUpdatePayload,
 	}
 
 	s.app.logMessage(fmt.Sprintf("Added custom DNS: %s -> %s", domain, ip))
@@ -283,15 +277,14 @@ func (s *SiteListManager) removeBlockedSite(index int) {
 		s.filterBlockedSites(s.searchEntry.Text)
 
 		// Send event to update the radix tree and save to file
-		operation := SiteData{
-			Operation: "delete",
-			Domain:    domain,
-			Type:      "blocked",
+		siteUpdatePayload["operation"] = "delete"
+		siteUpdatePayload["siteData"] = config.SiteData{
+			Domain: domain,
 		}
 
 		events.GlobalEventChannel <- events.Event{
 			Type:    events.UpdateSiteList,
-			Payload: operation,
+			Payload: siteUpdatePayload,
 		}
 
 		s.app.logMessage(fmt.Sprintf("Removed blocked domain: %s", domain))
@@ -305,16 +298,15 @@ func (s *SiteListManager) removeCustomDNS(index int) {
 		s.customDNSList.Refresh()
 
 		// Send event to update the custom DNS mapping
-		operation := SiteData{
-			Operation: "delete",
-			Domain:    entry.Domain,
-			IP:        entry.IP,
-			Type:      "custom_dns",
+		siteUpdatePayload["operation"] = "delete"
+		siteUpdatePayload["siteData"] = config.SiteData{
+			Domain: entry.Domain,
+			IP:     entry.IP,
 		}
 
 		events.GlobalEventChannel <- events.Event{
 			Type:    events.UpdateSiteList,
-			Payload: operation,
+			Payload: siteUpdatePayload,
 		}
 
 		s.app.logMessage(fmt.Sprintf("Removed custom DNS: %s -> %s", entry.Domain, entry.IP))
@@ -418,29 +410,7 @@ func (s *SiteListManager) loadCustomDNS() {
 	}
 }
 
-func (s *SiteListManager) createUI() *fyne.Container {
-	addDNSButton := widget.NewButton("Add DNS Entry", s.addCustomDNS)
-	addDNSButton.Importance = widget.HighImportance
-
-	dnsInputContainer := container.NewBorder(nil, nil, nil, addDNSButton,
-		container.NewBorder(nil, nil,
-			container.NewHBox(s.dnsNameEntry, widget.NewLabel("→")),
-			nil,
-			s.dnsIPEntry,
-		),
-	)
-
-	customDNSScrollContainer := container.NewScroll(s.customDNSList)
-	customDNSScrollContainer.SetMinSize(fyne.NewSize(400, 150))
-
-	customDNSCard := widget.NewCard("Custom DNS Mappings", "Map domains to specific IP addresses",
-		container.NewVBox(
-			dnsInputContainer,
-			customDNSScrollContainer,
-		),
-	)
-
-	// Blocked Sites Section with Search - Updated with stretching input fields
+func (s *SiteListManager) blockDNSTab() *fyne.Container {
 	addBlockedButton := widget.NewButton("Block Domain", s.addBlockedSite)
 	addBlockedButton.Importance = widget.DangerImportance
 
@@ -453,6 +423,9 @@ func (s *SiteListManager) createUI() *fyne.Container {
 	blockedScrollContainer := container.NewScroll(s.blockedList)
 	blockedScrollContainer.SetMinSize(fyne.NewSize(400, 200))
 
+	statsLabel := widget.NewLabel(fmt.Sprintf("Total Blocked Domains: %d", len(s.blockedSites)))
+	statsLabel.Importance = widget.MediumImportance
+
 	blockedSitesCard := widget.NewCard("Blocked Domains", "Domains that will be blocked by the DNS server",
 		container.NewVBox(
 			blockedInputContainer,
@@ -461,18 +434,55 @@ func (s *SiteListManager) createUI() *fyne.Container {
 		),
 	)
 
-	statsCard := widget.NewCard("Statistics", "",
+	return container.NewVBox(
+		statsLabel,
+		widget.NewSeparator(),
+		blockedSitesCard,
+	)
+}
+
+func (s *SiteListManager) customDNSTab() *fyne.Container {
+	addDNSButton := widget.NewButton("Add DNS Entry", s.addCustomDNS)
+	addDNSButton.Importance = widget.HighImportance
+
+	dnsInputContainer := container.NewBorder(nil, nil, nil, addDNSButton,
+		container.NewBorder(nil, nil,
+			container.NewHBox(s.dnsNameEntry, widget.NewLabel("→")),
+			nil,
+			s.dnsIPEntry,
+		),
+	)
+
+	customDNSScrollContainer := container.NewScroll(s.customDNSList)
+	customDNSScrollContainer.SetMinSize(fyne.NewSize(400, 1500))
+
+	statsLabel := widget.NewLabel(fmt.Sprintf("Custom DNS Entries: %d", len(s.customDNS)))
+	statsLabel.Importance = widget.MediumImportance
+
+	customDNSCard := widget.NewCard("Custom DNS Mappings", "Map domains to specific IP addresses",
 		container.NewVBox(
-			widget.NewLabel(fmt.Sprintf("Custom DNS Entries: %d", len(s.customDNS))),
-			widget.NewLabel(fmt.Sprintf("Total Blocked Domains: %d", len(s.blockedSites))),
+			dnsInputContainer,
+			customDNSScrollContainer,
 		),
 	)
 
 	return container.NewVBox(
-		statsCard,
+		statsLabel,
+		widget.NewSeparator(),
 		customDNSCard,
-		blockedSitesCard,
 	)
+}
+
+func (s *SiteListManager) createUI() *fyne.Container {
+
+	subTabs := container.NewAppTabs(
+		container.NewTabItem("Blocked Sites", s.blockDNSTab()),
+		container.NewTabItem("Custom DNS", s.customDNSTab()),
+	)
+
+	subTabs.SetTabLocation(container.TabLocationLeading)
+
+	return container.NewBorder(nil, nil, nil, nil, subTabs)
 }
 
 func (s *SiteListManager) siteListTab() *fyne.Container {

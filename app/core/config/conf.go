@@ -32,6 +32,11 @@ type Config struct {
 	ConfigDir     string `json:"-"`
 }
 
+type SiteData struct {
+	Domain string // domain name
+	IP     string // IP address (for custom DNS)
+}
+
 var Global = NewConfig()
 
 func LoadBlockedSites() error {
