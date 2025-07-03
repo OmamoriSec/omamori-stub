@@ -1,4 +1,4 @@
-package events
+package channels
 
 type EventType string
 
