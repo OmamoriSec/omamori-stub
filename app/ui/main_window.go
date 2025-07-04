@@ -6,11 +6,11 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"log"
 	"omamori/app/core/channels"
 	"omamori/app/core/config"
+	"omamori/app/ui/assets"
 	"time"
 )
 
@@ -65,7 +65,9 @@ func StartGUI() {
 		app:    app.New(),
 		window: nil,
 	}
-	omamori.app.SetIcon(theme.ComputerIcon())
+
+	omamori.app.SetIcon(assets.ResourceOmamorilogoPng)
+
 	omamori.window = omamori.app.NewWindow("Omamori")
 	omamori.window.Resize(fyne.NewSize(800, 600))
 
