@@ -4,4 +4,4 @@ chmod +x ./common.sh && ./common.sh
 
 #go build .
 
- fyne-cross linux -arch=* --app-id com.omamori.app ./app
+ fyne-cross linux -arch=* -output omamori --app-id com.omamori.app ./app

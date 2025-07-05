@@ -1,1 +1,1 @@
- fyne-cross android -arch=amd64 --app-id com.omamori.app ./app
+ fyne-cross android -arch=amd64 -output omamori --app-id com.omamori.app ./app
