@@ -154,7 +154,6 @@ func main() {
 				}
 
 			case channels.UpdateSiteList:
-				log.Printf("Received update site map %v", event.Payload)
 				payload := event.Payload.(map[string]interface{})
 				err := config.UpdateSiteList(payload["operation"].(string), payload["siteData"].(config.SiteData))
 				if err != nil {
