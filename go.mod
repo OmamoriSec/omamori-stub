@@ -1,6 +1,6 @@
 module omamori
 
-go 1.24.0
+go 1.21
 
 require fyne.io/fyne/v2 v2.6.1
 
