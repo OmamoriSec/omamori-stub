@@ -47,6 +47,10 @@ type Query struct {
 	// Here for simplicity, will only consider 1
 	Questions *Question
 	Answer    []*Answer
+
+	// TODO: for future
+	//Authority []*SOA
+	// AdditionalRecord []*ARN
 }
 
 // -- STRUCT END -- //
@@ -152,6 +156,8 @@ func encodeDomainName(name string) ([]byte, error) {
 
 // -- ENCODE METHOD END -- //
 
+// -- DECODE METHOD START -- //
+
 func DecodeDNSQuery(data []byte) (*Query, error) {
 	var dq Query
 	header, err := decodeDNSHeader(data)
@@ -211,7 +217,7 @@ func decodeDNSQuestion(data []byte, offset int) (*Question, error) {
 	return &q, nil
 }
 
-func decodeDnsAnswer(data []byte, dnsQuery *Query) ([]*Answer, error) {
+func decodeDnsAnswer(data []byte) ([]*Answer, error) {
 	if len(data) < 12 {
 		return nil, errors.New("invalid DNS response")
 	}
@@ -306,3 +312,5 @@ func decodeDnsAnswer(data []byte, dnsQuery *Query) ([]*Answer, error) {
 
 	return answers, nil
 }
+
+// -- DECODE METHOD END -- //

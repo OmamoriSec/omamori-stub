@@ -129,9 +129,10 @@ func Lookup(dnsQuery *Query) *Query {
 			continue
 		}
 
-		responses, err := decodeDnsAnswer(buf[:n], dnsQuery)
+		responses, err := decodeDnsAnswer(buf[:n])
 		if err != nil {
-			log.Printf("Error while fetching answer for %s via %s: %s\n", dnsQuery.Questions.Name, upstream, err)
+			log.Printf("Error while fetching answer for %s [Record %d] via %s: %s\n", dnsQuery.Questions.Name, dnsQuery.Questions.Type, upstream, err)
+			log.Printf("Received: %v", buf[:n])
 			continue
 		}
 
@@ -142,7 +143,7 @@ func Lookup(dnsQuery *Query) *Query {
 			// updating header to with actual number of answers
 			dnsQuery.Header.ANCOUNT = uint16(len(responses))
 
-			// cacnhing all the responses
+			// caching all the responses
 			for _, response := range responses {
 				go cache.DnsCache.Set(dnsQuery.Questions.Name, &cache.Record{
 					Type:      cache.RecordType(response.Type),
