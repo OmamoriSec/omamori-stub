@@ -5,3 +5,4 @@ compose.yml
 app/app
 *.txt
 scripts/push-tag.ps1
+fyne-cross
