@@ -182,6 +182,10 @@ func (s *SiteListManager) filterBlockedSites(searchText string) {
 func (s *SiteListManager) addBlockedSite() {
 	domain := strings.TrimSpace(s.blockDomainEntry.Text)
 	if domain == "" {
+		channels.LogEventChannel <- channels.Event{
+			Type:    channels.Error,
+			Payload: "Please enter a domain name to block",
+		}
 		dialog.ShowError(fmt.Errorf("please enter a domain name"), s.app.window)
 		return
 	}

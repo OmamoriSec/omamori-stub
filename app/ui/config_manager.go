@@ -38,16 +38,29 @@ func (c *ConfigManager) bindCheck(check *widget.Check, initialValue bool, onTogg
 
 func (c *ConfigManager) bindIPEntry(entry *widget.Entry, initial string) *widget.Entry {
 	entry.SetText(initial)
+	entry.OnSubmitted = func(input string) {
+		c.validateIP(entry, input)
+	}
+
 	entry.OnChanged = func(input string) {
-		if net.ParseIP(input) == nil {
-			entry.SetValidationError(fmt.Errorf("invalid IP address"))
-			c.configChanged = false
-		} else {
-			entry.SetValidationError(nil)
-			c.configChanged = true
-		}
+		c.configChanged = true
+		entry.SetValidationError(nil)
 	}
 	return entry
+}
+
+func (c *ConfigManager) validateIP(entry *widget.Entry, input string) {
+	if net.ParseIP(input) == nil && input != "" {
+		entry.SetValidationError(fmt.Errorf("invalid IP address"))
+		channels.LogEventChannel <- channels.Event{
+			Type:    channels.Error,
+			Payload: fmt.Sprintf("Invalid IP address entered: %s", input),
+		}
+		c.configChanged = false
+	} else {
+		entry.SetValidationError(nil)
+		c.configChanged = true
+	}
 }
 
 func (c *ConfigManager) saveConfig() {
@@ -84,7 +97,10 @@ func (c *ConfigManager) configurationTab() *container.Scroll {
 				if c.app.config.MapFile != reader.URI().Path() {
 					c.configChanged = true
 				}
-				reader.Close()
+				err := reader.Close()
+				if err != nil {
+					return
+				}
 			}
 		}, c.app.window)
 	})

@@ -33,6 +33,15 @@ func (lm *LogManager) AppendLog(message string) {
 	})
 }
 
+func (lm *LogManager) AppendErrorLogs(message string) {
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	message = fmt.Sprintf("[%s] ERROR: %s\n", timestamp, message)
+
+	fyne.Do(func() {
+		lm.logText.SetText(lm.logText.Text + message)
+	})
+}
+
 func (lm *LogManager) logTab() *fyne.Container {
 	logScroll := container.NewScroll(lm.logText)
 	logScroll.SetMinSize(fyne.NewSize(400, 400))

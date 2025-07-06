@@ -60,6 +60,25 @@ func (o *OmamoriApp) setup() {
 	o.window.SetContent(content)
 }
 
+func (o *OmamoriApp) showErrorToast(message string) {
+	toastLabel := widget.NewLabel("❌ " + message)
+	toastLabel.Importance = widget.DangerImportance
+
+	toastCard := widget.NewCard("", "", toastLabel)
+	toastCard.Resize(fyne.NewSize(300, 60))
+
+	windowSize := o.window.Canvas().Size()
+	toastCard.Move(fyne.NewPos(windowSize.Width-320, windowSize.Height-80))
+	o.window.Canvas().Overlays().Add(toastCard)
+
+	go func() {
+		time.Sleep(5 * time.Second)
+		fyne.Do(func() {
+			o.window.Canvas().Overlays().Remove(toastCard)
+		})
+	}()
+}
+
 func StartGUI() {
 	omamori := &OmamoriApp{
 		app:    app.New(),
@@ -79,15 +98,32 @@ func StartGUI() {
 	omamori.logManager = omamori.createLogManager()
 
 	go func() {
-		for data := range channels.LogEventChannel {
-			payload, ok := data.Payload.(string)
-			if !ok {
-				continue
-			}
+		for {
+			select {
+			case data := <-channels.LogEventChannel:
+				payload, ok := data.Payload.(string)
+				if !ok {
+					continue
+				}
+				fyne.Do(func() {
+					if data.Type == channels.Error {
+						omamori.logManager.AppendErrorLogs(payload)
+						omamori.showErrorToast(payload) // Show error toast
+					} else {
+						omamori.logManager.AppendLog(payload)
+					}
+				})
 
-			fyne.Do(func() {
-				omamori.logManager.AppendLog(payload)
-			})
+			case data := <-channels.GlobalEventChannel:
+				if data.Type == channels.Error {
+					if err, ok := data.Payload.(error); ok {
+						fyne.Do(func() {
+							omamori.logManager.AppendErrorLogs(err.Error())
+							omamori.showErrorToast(err.Error()) // Show error toast
+						})
+					}
+				}
+			}
 		}
 	}()
 
