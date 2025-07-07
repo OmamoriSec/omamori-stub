@@ -88,17 +88,22 @@ func configureWindowsDNS() error {
 		return errors.New("no active network interfaces found")
 	}
 
-	// Backup current settings (silent)
 	for _, iface := range interfaces {
-		backupDNSSettings(iface)
+		err := backupDNSSettings(iface)
+		if err != nil {
+			return err
+		}
 	}
 
-	// Configure new DNS settings (silent)
 	for _, iface := range interfaces {
-		// Set IPv4 DNS (ignore errors)
-		runNetshCommand("interface", "ip", "set", "dns", iface, "static", localDNSIP)
-		// Set IPv6 DNS (ignore errors)
-		runNetshCommand("interface", "ipv6", "set", "dns", iface, "static", "::1")
+		err := runNetshCommand("interface", "ip", "set", "dns", iface, "static", localDNSIP)
+		if err != nil {
+			return err
+		}
+		err = runNetshCommand("interface", "ipv6", "set", "dns", iface, "static", "::1")
+		if err != nil {
+			return err
+		}
 	}
 
 	isDNSConfigured = true
@@ -109,22 +114,35 @@ func configureWindowsDNS() error {
 func restoreWindowsDNS() error {
 	logEvent(channels.Log, "🔄 Restoring original DNS settings...")
 
-	// Restore silently
 	for interfaceName, backup := range originalSettings {
 		if backup.IsDHCP {
-			runNetshCommand("interface", "ip", "set", "dns", interfaceName, "dhcp")
-			runNetshCommand("interface", "ipv6", "set", "dns", interfaceName, "dhcp")
+			err := runNetshCommand("interface", "ip", "set", "dns", interfaceName, "dhcp")
+			if err != nil {
+				return err
+			}
+			err = runNetshCommand("interface", "ipv6", "set", "dns", interfaceName, "dhcp")
+			if err != nil {
+				return err
+			}
 		} else if len(backup.DNSServers) > 0 {
-			runNetshCommand("interface", "ip", "set", "dns", interfaceName, "static", backup.DNSServers[0])
+			err := runNetshCommand("interface", "ip", "set", "dns", interfaceName, "static", backup.DNSServers[0])
+			if err != nil {
+				return err
+			}
 			for _, dns := range backup.DNSServers[1:] {
-				runNetshCommand("interface", "ip", "add", "dns", interfaceName, dns)
+				err := runNetshCommand("interface", "ip", "add", "dns", interfaceName, dns)
+				if err != nil {
+					return err
+				}
 			}
 		} else {
-			runNetshCommand("interface", "ip", "set", "dns", interfaceName, "dhcp")
+			err := runNetshCommand("interface", "ip", "set", "dns", interfaceName, "dhcp")
+			if err != nil {
+				return err
+			}
 		}
 	}
 
-	// Reset state
 	originalSettings = make(map[string]DNSBackup)
 	isDNSConfigured = false
 	logEvent(channels.Log, "✅ Original DNS settings restored")
