@@ -7,13 +7,11 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"syscall"
 )
 
 // Helper functions - Windows
 func getActiveWindowsInterfaces() ([]string, error) {
 	cmd := exec.Command("netsh", "interface", "show", "interface")
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, err
@@ -35,7 +33,6 @@ func getActiveWindowsInterfaces() ([]string, error) {
 
 func backupWindowsDNSSettings(interfaceName string) error {
 	cmd := exec.Command("netsh", "interface", "ip", "show", "dns", interfaceName)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	output, err := cmd.Output()
 	if err != nil {
 		return err
