@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"omamori/app/core/channels"
 	"omamori/app/core/internal/radix"
 	"os"
 	"os/exec"
@@ -241,6 +242,10 @@ func SaveConfig() error {
 func NewConfig() *Config {
 	rootConfigDir, err := os.UserConfigDir()
 	if err != nil {
+		channels.LogEventChannel <- channels.Event{
+			Type:    channels.Error,
+			Payload: fmt.Sprintf("Error: Fetching Config Directory: %v\n", err),
+		}
 		log.Fatalf("Error: Fetching Config Directory: %v\n", err)
 	}
 

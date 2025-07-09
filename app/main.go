@@ -11,7 +11,6 @@ import (
 	"omamori/app/core/dns"
 	"omamori/app/dohs"
 	"omamori/app/ui"
-	"runtime"
 	"time"
 )
 
@@ -36,8 +35,7 @@ func loadConf() {
 }
 
 func startUdpServer(port int) (*net.UDPConn, error) {
-	// Bind to all interfaces (0.0.0.0) so it can receive requests from the system
-	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("0.0.0.0:%d", 53))
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("127.0.0.1:%d", 53))
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve UDP address: %s", err)
 	}
@@ -121,7 +119,6 @@ func handleDNSRequest(ctx context.Context, port int) {
 func main() {
 	config.InitDNSConfig("127.0.0.1")
 
-	log.Printf("environment: %s\n", runtime.GOOS)
 	if err := config.CheckDNSPrivileges(); err != nil {
 		log.Printf("Privilege check failed: %v", err)
 		log.Println("System DNS configuration will be disabled")
@@ -131,6 +128,10 @@ func main() {
 
 	configData, err := config.EnsureDefaultConfig()
 	if err != nil {
+		channels.LogEventChannel <- channels.Event{
+			Type:    channels.Error,
+			Payload: fmt.Sprintf("Failed to ensure default config: %v", err),
+		}
 		log.Fatal(err)
 	}
 

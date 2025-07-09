@@ -2,11 +2,11 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"omamori/app/core/channels"
 	"os"
 	"os/exec"
 	"runtime"
-	"strings"
 )
 
 type DNSBackup struct {
@@ -26,17 +26,27 @@ func InitDNSConfig(localIP string) {
 	originalSettings = make(map[string]DNSBackup)
 }
 
+// CheckDNSPrivileges verifies if the application has the necessary privileges to modify DNS settings
 func CheckDNSPrivileges() error {
 	switch runtime.GOOS {
-	case "linux", "darwin":
+	case "linux":
+		if isAndroidEnvironment() {
+			return checkAndroidPrivileges()
+		}
 		if os.Geteuid() != 0 {
-			return errors.New("requires root privileges")
+			return errors.New("requires root privileges - please run with sudo")
+		}
+		return nil
+	case "darwin":
+		cmd := exec.Command("networksetup", "-listallnetworkservices")
+		if err := cmd.Run(); err != nil {
+			return errors.New("requires admin privileges - please run with sudo")
 		}
 		return nil
 	case "windows":
-		cmd := exec.Command("netsh", "interface", "show", "interface")
-		if err := cmd.Run(); err != nil {
-			return errors.New("requires admin privileges")
+		err := runCommand("netsh", "interface", "show", "interface")
+		if err != nil {
+			return errors.New("requires admin privileges - please run as Administrator")
 		}
 		return nil
 	default:
@@ -44,6 +54,7 @@ func CheckDNSPrivileges() error {
 	}
 }
 
+// ConfigureSystemDNS configures the system to use the local DNS server
 func ConfigureSystemDNS() error {
 	if isDNSConfigured {
 		return errors.New("DNS already configured")
@@ -53,14 +64,18 @@ func ConfigureSystemDNS() error {
 	case "windows":
 		return configureWindowsDNS()
 	case "linux":
-		return nil
+		if isAndroidEnvironment() {
+			return configureAndroidDNS()
+		}
+		return configureLinuxDNS()
 	case "darwin":
-		return nil
+		return configureDarwinDNS()
 	default:
 		return errors.New("unsupported platform: " + runtime.GOOS)
 	}
 }
 
+// RestoreSystemDNS restores the original DNS settings
 func RestoreSystemDNS() error {
 	if !isDNSConfigured {
 		return nil
@@ -70,73 +85,123 @@ func RestoreSystemDNS() error {
 	case "windows":
 		return restoreWindowsDNS()
 	case "linux":
-		return nil
+		if isAndroidEnvironment() {
+			return restoreAndroidDNS()
+		}
+		return restoreLinuxDNS()
 	case "darwin":
-		return nil
+		return restoreDarwinDNS()
 	default:
 		return errors.New("unsupported platform: " + runtime.GOOS)
 	}
 }
 
+// configureWindowsDNS sets up DNS configuration on Windows
 func configureWindowsDNS() error {
-	interfaces, err := getActiveInterfaces()
+	interfaces, err := getActiveWindowsInterfaces()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get active interfaces: %w", err)
 	}
 
-	if len(interfaces) == 0 {
-		return errors.New("no active network interfaces found")
-	}
-
+	// Backup current settings
 	for _, iface := range interfaces {
-		err := backupDNSSettings(iface)
-		if err != nil {
-			return err
+		if err := backupWindowsDNSSettings(iface); err != nil {
+			return fmt.Errorf("failed to backup DNS settings for %s: %w", iface, err)
 		}
 	}
 
+	// Set DNS for all interfaces
 	for _, iface := range interfaces {
-		err := runNetshCommand("interface", "ip", "set", "dns", iface, "static", localDNSIP)
+		err := runCommand("netsh", "interface", "ip", "set", "dns", iface, "static", localDNSIP)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to set DNS for %s: %w", iface, err)
 		}
-		err = runNetshCommand("interface", "ipv6", "set", "dns", iface, "static", "::1")
+		err = runCommand("netsh", "interface", "ipv6", "set", "dns", iface, "static", "::1")
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to set IPv6 DNS for %s: %w", iface, err)
 		}
 	}
 
 	isDNSConfigured = true
-	logEvent(channels.Log, "🔧 System DNS configured to use Omamori")
+	logEvent(channels.Log, "🔧 System DNS configured to use Omamori (Windows)")
 	return nil
 }
 
+// configureLinuxDNS sets up DNS configuration on Linux
+func configureLinuxDNS() error {
+	// Try systemd-resolved first, fallback to resolv.conf
+	if commandExists("resolvectl") {
+		return configureSystemdResolved()
+	}
+	return configureResolvConf()
+}
+
+// configureAndroidDNS sets up DNS configuration on Android
+func configureAndroidDNS() error {
+	if isDeviceRooted() {
+		return configureRootedAndroidDNS()
+	}
+
+	// Provide manual instructions for non-rooted devices
+	logEvent(channels.Log, "⚠️ Non-rooted Android device detected")
+	logEvent(channels.Log, "📱 Please configure DNS manually in Wi-Fi settings")
+	logEvent(channels.Log, fmt.Sprintf("Set DNS to: %s", localDNSIP))
+	return errors.New("manual configuration required for non-rooted devices")
+}
+
+// configureDarwinDNS sets up DNS configuration on macOS
+func configureDarwinDNS() error {
+	services, err := getActiveDarwinServices()
+	if err != nil {
+		return fmt.Errorf("failed to get network services: %w", err)
+	}
+
+	// Backup current settings
+	for _, service := range services {
+		if err := backupDarwinDNSSettings(service); err != nil {
+			return fmt.Errorf("failed to backup DNS settings for %s: %w", service, err)
+		}
+	}
+
+	// Set DNS for all services
+	for _, service := range services {
+		if err := setDarwinDNS(service, localDNSIP); err != nil {
+			return fmt.Errorf("failed to set DNS for %s: %w", service, err)
+		}
+	}
+
+	isDNSConfigured = true
+	logEvent(channels.Log, "🔧 System DNS configured to use Omamori (macOS)")
+	return nil
+}
+
+// restoreWindowsDNS restores original DNS settings on Windows
 func restoreWindowsDNS() error {
 	logEvent(channels.Log, "🔄 Restoring original DNS settings...")
 
 	for interfaceName, backup := range originalSettings {
 		if backup.IsDHCP {
-			err := runNetshCommand("interface", "ip", "set", "dns", interfaceName, "dhcp")
+			err := runCommand("netsh", "interface", "ip", "set", "dns", interfaceName, "dhcp")
 			if err != nil {
 				return err
 			}
-			err = runNetshCommand("interface", "ipv6", "set", "dns", interfaceName, "dhcp")
+			err = runCommand("netsh", "interface", "ipv6", "set", "dns", interfaceName, "dhcp")
 			if err != nil {
 				return err
 			}
 		} else if len(backup.DNSServers) > 0 {
-			err := runNetshCommand("interface", "ip", "set", "dns", interfaceName, "static", backup.DNSServers[0])
+			err := runCommand("netsh", "interface", "ip", "set", "dns", interfaceName, "static", backup.DNSServers[0])
 			if err != nil {
 				return err
 			}
 			for _, dns := range backup.DNSServers[1:] {
-				err := runNetshCommand("interface", "ip", "add", "dns", interfaceName, dns)
+				err := runCommand("netsh", "interface", "ip", "add", "dns", interfaceName, dns)
 				if err != nil {
 					return err
 				}
 			}
 		} else {
-			err := runNetshCommand("interface", "ip", "set", "dns", interfaceName, "dhcp")
+			err := runCommand("netsh", "interface", "ip", "set", "dns", interfaceName, "dhcp")
 			if err != nil {
 				return err
 			}
@@ -145,76 +210,42 @@ func restoreWindowsDNS() error {
 
 	originalSettings = make(map[string]DNSBackup)
 	isDNSConfigured = false
-	logEvent(channels.Log, "✅ Original DNS settings restored")
+	logEvent(channels.Log, "✅ Original DNS settings restored (Windows)")
 	return nil
 }
 
-func getActiveInterfaces() ([]string, error) {
-	cmd := exec.Command("netsh", "interface", "show", "interface")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, err
-	}
+// restoreLinuxDNS restores original DNS settings on Linux
+func restoreLinuxDNS() error {
+	logEvent(channels.Log, "🔄 Restoring original DNS settings...")
 
-	var interfaces []string
-	for _, line := range strings.Split(string(output), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.Contains(line, "Connected") &&
-			(strings.Contains(line, "Wi-Fi") || strings.Contains(line, "Ethernet")) {
-			parts := strings.Fields(line)
-			if len(parts) >= 4 {
-				interfaces = append(interfaces, parts[len(parts)-1])
-			}
-		}
+	if commandExists("resolvectl") {
+		return restoreSystemdResolved()
 	}
-	return interfaces, nil
+	return restoreResolvConf()
 }
 
-func backupDNSSettings(interfaceName string) error {
-	cmd := exec.Command("netsh", "interface", "ip", "show", "dns", interfaceName)
-	output, err := cmd.Output()
-	if err != nil {
-		return err
+// restoreAndroidDNS restores original DNS settings on Android
+func restoreAndroidDNS() error {
+	if isDeviceRooted() {
+		return restoreRootedAndroidDNS()
 	}
 
-	backup := DNSBackup{
-		InterfaceName: interfaceName,
-		DNSServers:    []string{},
-		IsDHCP:        false,
-	}
-
-	for _, line := range strings.Split(string(output), "\n") {
-		line = strings.TrimSpace(line)
-
-		if strings.Contains(line, "DNS servers configured through DHCP:") {
-			backup.IsDHCP = true
-			if parts := strings.Split(line, ":"); len(parts) > 1 {
-				if dns := strings.TrimSpace(parts[1]); dns != "" && dns != "None" {
-					backup.DNSServers = append(backup.DNSServers, dns)
-				}
-			}
-		} else if strings.Contains(line, "Statically Configured DNS Servers:") {
-			backup.IsDHCP = false
-		} else if strings.Contains(line, ".") && !strings.Contains(line, ":") {
-			if dns := strings.TrimSpace(line); dns != "" {
-				backup.DNSServers = append(backup.DNSServers, dns)
-			}
-		}
-	}
-
-	originalSettings[interfaceName] = backup
+	logEvent(channels.Log, "🔄 Please manually restore DNS settings in Wi-Fi configuration")
 	return nil
 }
 
-func runNetshCommand(args ...string) error {
-	cmd := exec.Command("netsh", args...)
-	_, err := cmd.CombinedOutput()
-	return err
-}
+// restoreDarwinDNS restores original DNS settings on macOS
+func restoreDarwinDNS() error {
+	logEvent(channels.Log, "🔄 Restoring original DNS settings...")
 
-func logEvent(eventType channels.EventType, message string) {
-	channels.LogEventChannel <- channels.Event{
-		Type:    eventType,
-		Payload: message,
+	for serviceName, backup := range originalSettings {
+		if err := restoreDarwinDNSService(serviceName, backup); err != nil {
+			return fmt.Errorf("failed to restore DNS for %s: %w", serviceName, err)
+		}
 	}
+
+	originalSettings = make(map[string]DNSBackup)
+	isDNSConfigured = false
+	logEvent(channels.Log, "✅ Original DNS settings restored (macOS)")
+	return nil
 }
