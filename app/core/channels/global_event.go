@@ -9,12 +9,8 @@ const (
 	StopDOHServer  EventType = "STOP_DOH_SERVER"
 	UpdateConfig   EventType = "UPDATE_CONFIG"
 	UpdateSiteList EventType = "UPDATE_SITE_LIST"
-
-	ConfigureSystemDNS EventType = "CONFIGURE_SYSTEM_DNS"
-	RestoreSystemDNS   EventType = "RESTORE_SYSTEM_DNS"
-
-	Error EventType = "ERROR"
-	Log   EventType = "LOG"
+	Error          EventType = "ERROR"
+	Log            EventType = "LOG"
 )
 
 type Event struct {
