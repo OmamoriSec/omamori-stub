@@ -6,7 +6,6 @@ import (
 	"omamori/app/core/channels"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 	"syscall"
 )
@@ -411,9 +410,6 @@ func restoreFile(src, dest, restartCmd string) error {
 
 func runCommand(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
-	if runtime.GOOS == "windows" {
-		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true} // Hide command window on Windows
-	}
 	_, err := cmd.CombinedOutput()
 	return err
 }
