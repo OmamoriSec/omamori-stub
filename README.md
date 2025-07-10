@@ -1,5 +1,6 @@
+# Omamori - protection from unholy
+
 ![Omamori](app/ui/assets/omamori_poster.png)
-<h2 style="text-align:center;">omamori - protection from unholy</h2>
 
 ## Features
 
