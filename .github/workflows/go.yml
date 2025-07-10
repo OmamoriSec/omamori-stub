@@ -16,7 +16,7 @@ permissions:
 
 jobs:
 
-  build:
+  build-omamori:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -24,23 +24,72 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.24.0'
-    
-    - name: Install X11 development libraries
-      run: sudo apt-get update && sudo apt-get install -y gcc libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev
-    
-    - name: Install dependencies
-      run: go mod download
-    
-    - name: Build
-      run:  go build -v -o omamori ./app
+        go-version: '1.21'
 
-    - name: Upload release binary
-      if: startsWith(github.ref, 'refs/tags/')
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        TAG_NAME="${GITHUB_REF#refs/tags/}"
-        gh release create "$TAG_NAME" omamori \
-          --title "Release $TAG_NAME" \
-          --notes "Automated release for $TAG_NAME"
+    - name: Init Environment
+      run: chmod +x ./scripts/build/common.sh && ./scripts/build/common.sh
+
+    - name: Build for Linux
+      run: chmod +x ./scripts/build/linux.sh && ./scripts/build/linux.sh
+
+    - name: Build for windows
+      run: chmod +x ./scripts/build/windows.sh && ./scripts/build/windows.sh
+
+    - name: Build for Android
+      run: chmod +x ./scripts/build/android.sh && ./scripts/build/android.sh
+
+    - name: Upload linux-amd64 artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-amd64
+        path: ./fyne-cross/dist/linux-amd64/omamori.tar.xz
+
+    - name: Upload linux-arm64 artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-arm64
+        path: ./fyne-cross/dist/linux-arm64/omamori.tar.xz
+
+    - name: Upload windows-amd64 artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-amd64
+        path: ./fyne-cross/dist/windows-amd64/omamori.zip
+
+    - name: Upload windows-arm64 artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-arm64
+        path: ./fyne-cross/dist/windows-arm64/omamori.zip
+
+    - name: Upload android-arm64 artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: android-arm64
+        path: ./fyne-cross/dist/android-arm64/omamori.apk
+
+  create-release:
+    needs: [ build-omamori ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get the version
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1.14.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.get_version.outputs.VERSION }}
+          name: LiSA ${{ steps.get_version.outputs.VERSION }}
+          draft: true
+          prerelease: false
+          artifacts: "linux-amd64/*,linux-arm64/*,windows-amd64/*,windows-arm64/*,android-arm64/*"

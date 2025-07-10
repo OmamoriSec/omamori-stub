@@ -81,7 +81,7 @@ func (o *OmamoriApp) showErrorToast(message string) {
 
 func StartGUI() {
 	omamori := &OmamoriApp{
-		app:    app.New(),
+		app:    app.NewWithID("com.omamori.app"),
 		window: nil,
 	}
 

@@ -1,7 +1,3 @@
-sudo apt-get install golang gcc libgl1-mesa-dev xorg-dev libxkbcommon-dev openssl -y
+#!/usr/bin/bash
 
-chmod +x ./common.sh && ./common.sh
-
-#go build .
-
- fyne-cross linux -arch=* -output omamori --app-id com.omamori.app ./app
+fyne-cross linux -arch=amd64,arm64 -output omamori --app-id com.omamori.app ./app

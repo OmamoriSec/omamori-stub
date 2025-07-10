@@ -5,6 +5,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
+	"strings"
 	"time"
 )
 
@@ -29,7 +30,12 @@ func (lm *LogManager) AppendLog(message string) {
 	message = fmt.Sprintf("[%s] %s\n", timestamp, message)
 
 	fyne.Do(func() {
-		lm.logText.SetText(lm.logText.Text + message)
+		existingText := lm.logText.Text
+		lm.logText.SetText(message + existingText)
+		lines := strings.Split(lm.logText.Text, "\n")
+		if len(lines) > 1000 {
+			lm.logText.SetText(strings.Join(lines[:1000], "\n"))
+		}
 	})
 }
 
@@ -38,15 +44,32 @@ func (lm *LogManager) AppendErrorLogs(message string) {
 	message = fmt.Sprintf("[%s] ERROR: %s\n", timestamp, message)
 
 	fyne.Do(func() {
-		lm.logText.SetText(lm.logText.Text + message)
+		existingText := lm.logText.Text
+		lm.logText.SetText(message + existingText)
+		lines := strings.Split(lm.logText.Text, "\n")
+		if len(lines) > 1000 {
+			lm.logText.SetText(strings.Join(lines[:1000], "\n"))
+		}
 	})
 }
 
 func (lm *LogManager) logTab() *fyne.Container {
 	logScroll := container.NewScroll(lm.logText)
 	logScroll.SetMinSize(fyne.NewSize(400, 400))
+	clearButton := widget.NewButton("Clear Logs", func() {
+		lm.logText.SetText("")
+	})
+	clearButton.Importance = widget.LowImportance
 
 	return container.NewVBox(
-		widget.NewCard("DNS Logs", "View DNS logs here", logScroll),
+		widget.NewCard("DNS Logs", "View DNS logs here (newest first)",
+			container.NewVBox(
+				container.NewHBox(
+					widget.NewLabel(""), // Spacer
+					clearButton,
+				),
+				logScroll,
+			),
+		),
 	)
 }

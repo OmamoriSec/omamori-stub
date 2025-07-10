@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -34,8 +35,7 @@ func loadConf() {
 }
 
 func startUdpServer(port int) (*net.UDPConn, error) {
-
-	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("127.0.0.1:%d", port))
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("127.0.0.1:%d", 53))
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve UDP address: %s", err)
 	}
@@ -46,6 +46,12 @@ func startUdpServer(port int) (*net.UDPConn, error) {
 	}
 
 	log.Println("Listening on", udpConn.LocalAddr().String())
+
+	// Log when server starts to confirm it's running
+	channels.LogEventChannel <- channels.Event{
+		Type:    channels.Log,
+		Payload: fmt.Sprintf("🚀 DNS Server started on port %d", port),
+	}
 
 	return udpConn, nil
 
@@ -63,17 +69,27 @@ func handleDNSRequest(ctx context.Context, port int) {
 
 	buf := make([]byte, 512)
 
+	channels.LogEventChannel <- channels.Event{
+		Type:    channels.Log,
+		Payload: "🎯 DNS Server ready to receive queries...",
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
 			log.Println("Shutting down udp server gracefully")
+			channels.LogEventChannel <- channels.Event{
+				Type:    channels.Log,
+				Payload: "🛑 DNS Server stopped",
+			}
 			_ = udpConn.Close()
 			return
 		default:
 			_ = udpConn.SetReadDeadline(time.Now().Add(1 * time.Second))
 			size, source, err := udpConn.ReadFromUDP(buf)
 			if err != nil {
-				if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				var ne net.Error
+				if errors.As(err, &ne) && ne.Timeout() {
 					continue // check context again
 				}
 				log.Println("Error receiving data:", err)
@@ -103,6 +119,10 @@ func handleDNSRequest(ctx context.Context, port int) {
 func main() {
 	configData, err := config.EnsureDefaultConfig()
 	if err != nil {
+		channels.LogEventChannel <- channels.Event{
+			Type:    channels.Error,
+			Payload: fmt.Sprintf("Failed to ensure default config: %v", err),
+		}
 		log.Fatal(err)
 	}
 
@@ -125,10 +145,24 @@ func main() {
 				}
 				dnsCtx, dnsCancel = context.WithCancel(context.Background())
 				go handleDNSRequest(dnsCtx, configData.UdpServerPort)
+
+				if err := config.ConfigureSystemDNS(); err != nil {
+					channels.LogEventChannel <- channels.Event{
+						Type:    channels.Error,
+						Payload: fmt.Sprintf("Failed to configure system DNS: %v", err),
+					}
+				}
 			case channels.StopDnsServer:
 				if dnsCancel != nil {
 					dnsCancel()
 					dnsCancel = nil
+				}
+
+				if err := config.RestoreSystemDNS(); err != nil {
+					channels.LogEventChannel <- channels.Event{
+						Type:    channels.Error,
+						Payload: fmt.Sprintf("Failed to restore system DNS: %v", err),
+					}
 				}
 			case channels.StartDOHServer:
 				if dohCancel != nil {
