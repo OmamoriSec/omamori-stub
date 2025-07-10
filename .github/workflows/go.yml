@@ -16,7 +16,7 @@ permissions:
 
 jobs:
 
-  build:
+  build-linux:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -24,16 +24,25 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.24.0'
-    
-    - name: Install X11 development libraries
-      run: sudo apt-get update && sudo apt-get install -y gcc libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev
-    
-    - name: Install dependencies
-      run: go mod download
-    
-    - name: Build
-      run:  go build -v -o omamori ./app
+        go-version: '1.21'
+
+    - name: Init Environment
+      run: chmod +x ./scripts/build/common.sh && ./scripts/build/common.sh
+
+    - name: Build for Linux
+      run: chmod +x ./scripts/build/linux.sh && ./scripts/build/linux.sh
+
+    - name: Build for windows
+      run: chmod +x ./scripts/build/windows.sh && ./scripts/build/windows.sh
+
+    - name: Build for Android
+      run: chmod +x ./scripts/build/android.sh && ./scripts/build/android.sh
+
+#    - name: Upload Linux artifact
+#      uses: actions/upload-artifact@v4
+#      with:
+#        name: linux-amd64
+#        path: fyne-cross/dist/linux-amd64/omamori
 
     - name: Upload release binary
       if: startsWith(github.ref, 'refs/tags/')
@@ -44,3 +53,4 @@ jobs:
         gh release create "$TAG_NAME" omamori \
           --title "Release $TAG_NAME" \
           --notes "Automated release for $TAG_NAME"
+
