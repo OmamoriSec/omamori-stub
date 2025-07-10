@@ -20,8 +20,7 @@ func getActiveWindowsInterfaces() ([]string, error) {
 	var interfaces []string
 	for _, line := range strings.Split(string(output), "\n") {
 		line = strings.TrimSpace(line)
-		if strings.Contains(line, "Connected") &&
-			(strings.Contains(line, "Wi-Fi") || strings.Contains(line, "Ethernet")) {
+		if strings.Contains(line, "Connected") {
 			parts := strings.Fields(line)
 			if len(parts) >= 4 {
 				interfaces = append(interfaces, parts[len(parts)-1])
@@ -406,6 +405,7 @@ func restoreFile(src, dest, restartCmd string) error {
 }
 
 func runCommand(name string, args ...string) error {
+	logEvent(channels.Log, fmt.Sprintf("Running command: %s %s", name, strings.Join(args, " ")))
 	cmd := exec.Command(name, args...)
 	_, err := cmd.CombinedOutput()
 	return err
