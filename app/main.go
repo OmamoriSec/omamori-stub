@@ -117,15 +117,6 @@ func handleDNSRequest(ctx context.Context, port int) {
 }
 
 func main() {
-	config.InitDNSConfig("127.0.0.1")
-
-	if err := config.CheckDNSPrivileges(); err != nil {
-		log.Printf("Privilege check failed: %v", err)
-		log.Println("System DNS configuration will be disabled")
-	} else {
-		log.Println("Sufficient privileges for DNS configuration")
-	}
-
 	configData, err := config.EnsureDefaultConfig()
 	if err != nil {
 		channels.LogEventChannel <- channels.Event{

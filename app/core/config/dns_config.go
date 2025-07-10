@@ -21,18 +21,10 @@ var (
 	originalSettings = make(map[string]DNSBackup)
 )
 
-func InitDNSConfig(localIP string) {
-	localDNSIP = localIP
-	originalSettings = make(map[string]DNSBackup)
-}
-
 // CheckDNSPrivileges verifies if the application has the necessary privileges to modify DNS settings
 func CheckDNSPrivileges() error {
 	switch runtime.GOOS {
 	case "linux":
-		if isAndroidEnvironment() {
-			return checkAndroidPrivileges()
-		}
 		if os.Geteuid() != 0 {
 			return errors.New("requires root privileges - please run with sudo")
 		}
@@ -49,6 +41,8 @@ func CheckDNSPrivileges() error {
 			return errors.New("requires admin privileges - please run as Administrator")
 		}
 		return nil
+	case "android":
+		return checkAndroidPrivileges()
 	default:
 		return errors.New("unsupported platform: " + runtime.GOOS)
 	}
@@ -64,12 +58,11 @@ func ConfigureSystemDNS() error {
 	case "windows":
 		return configureWindowsDNS()
 	case "linux":
-		if isAndroidEnvironment() {
-			return configureAndroidDNS()
-		}
 		return configureLinuxDNS()
 	case "darwin":
 		return configureDarwinDNS()
+	case "android":
+		return configureAndroidDNS()
 	default:
 		return errors.New("unsupported platform: " + runtime.GOOS)
 	}
