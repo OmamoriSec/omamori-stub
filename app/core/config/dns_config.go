@@ -78,12 +78,11 @@ func RestoreSystemDNS() error {
 	case "windows":
 		return restoreWindowsDNS()
 	case "linux":
-		if isAndroidEnvironment() {
-			return restoreAndroidDNS()
-		}
 		return restoreLinuxDNS()
 	case "darwin":
 		return restoreDarwinDNS()
+	case "android":
+		return restoreAndroidDNS()
 	default:
 		return errors.New("unsupported platform: " + runtime.GOOS)
 	}
