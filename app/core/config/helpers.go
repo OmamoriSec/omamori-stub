@@ -43,8 +43,16 @@ func backupWindowsDNSSettings(interfaceName string) error {
 		IsDHCP:        false,
 	}
 
-	for _, line := range strings.Split(string(output), "\n") {
-		line = strings.TrimSpace(line)
+	capturingStaticDNS := false
+
+	for _, rawLine := range strings.Split(string(output), "\n") {
+		line := strings.TrimSpace(rawLine)
+		if line == "" {
+			capturingStaticDNS = false
+			continue
+		}
+
+		// Check if DNS is set via DHCP
 		if strings.Contains(line, "DNS servers configured through DHCP:") {
 			backup.IsDHCP = true
 			if parts := strings.Split(line, ":"); len(parts) > 1 {
@@ -52,10 +60,22 @@ func backupWindowsDNSSettings(interfaceName string) error {
 					backup.DNSServers = append(backup.DNSServers, dns)
 				}
 			}
-		} else if strings.Contains(line, ".") && !strings.Contains(line, ":") {
-			if dns := strings.TrimSpace(line); dns != "" {
-				backup.DNSServers = append(backup.DNSServers, dns)
+			break // DHCP means we don't care about static list, as anyway it'll be not in use
+		}
+
+		if strings.Contains(line, "Statically Configured DNS Servers:") {
+			capturingStaticDNS = true
+			if parts := strings.Split(line, ":"); len(parts) > 1 {
+				if dns := strings.TrimSpace(parts[1]); dns != "" {
+					backup.DNSServers = append(backup.DNSServers, dns)
+				}
 			}
+			continue
+		}
+
+		// Continue capturing additional static DNS lines
+		if capturingStaticDNS && strings.Contains(line, ".") {
+			backup.DNSServers = append(backup.DNSServers, line)
 		}
 	}
 
