@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"omamori/app/core/channels"
-	"os"
-	"os/exec"
 	"runtime"
 )
 
@@ -20,33 +18,6 @@ var (
 	localDNSIP       = "127.0.0.1"
 	originalSettings = make(map[string]DNSBackup)
 )
-
-// CheckDNSPrivileges verifies if the application has the necessary privileges to modify DNS settings
-func CheckDNSPrivileges() error {
-	switch runtime.GOOS {
-	case "linux":
-		if os.Geteuid() != 0 {
-			return errors.New("requires root privileges - please run with sudo")
-		}
-		return nil
-	case "darwin":
-		cmd := exec.Command("networksetup", "-listallnetworkservices")
-		if err := cmd.Run(); err != nil {
-			return errors.New("requires admin privileges - please run with sudo")
-		}
-		return nil
-	case "windows":
-		err := runCommand("netsh", "interface", "show", "interface")
-		if err != nil {
-			return errors.New("requires admin privileges - please run as Administrator")
-		}
-		return nil
-	case "android":
-		return checkAndroidPrivileges()
-	default:
-		return errors.New("unsupported platform: " + runtime.GOOS)
-	}
-}
 
 // ConfigureSystemDNS configures the system to use the local DNS server
 func ConfigureSystemDNS() error {
