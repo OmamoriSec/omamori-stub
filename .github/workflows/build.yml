@@ -1,6 +1,3 @@
-# This workflow will build a golang project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
-
 name: Build Executable
 
 on:
@@ -78,8 +75,35 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Download all artifacts
+      - name: Download linux-amd64 artifact
         uses: actions/download-artifact@v4
+        with:
+          name: linux-amd64
+          path: ./artifacts/linux-amd64
+
+      - name: Download linux-arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-arm64
+          path: ./artifacts/linux-arm64
+
+      - name: Download windows-amd64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-amd64
+          path: ./artifacts/windows-amd64
+
+      - name: Download windows-arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-arm64
+          path: ./artifacts/windows-arm64
+
+      - name: Download android-arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: android-arm64
+          path: ./artifacts/android-arm64
 
       - name: Create Release
         uses: ncipollo/release-action@v1.14.0
@@ -89,4 +113,10 @@ jobs:
           name: Omamori ${{ steps.get_version.outputs.VERSION }}
           draft: true
           prerelease: false
-          artifacts: "linux-amd64/*,linux-arm64/*,windows-amd64/*,windows-arm64/*,android-arm64/*"
+          generateReleaseNotes: true
+          artifacts: |
+            artifacts/linux-amd64/*
+            artifacts/linux-arm64/*
+            artifacts/windows-amd64/*
+            artifacts/windows-arm64/*
+            artifacts/android-arm64/*
