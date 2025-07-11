@@ -32,91 +32,58 @@ jobs:
     - name: Build for Android
       run: chmod +x ./scripts/build/android.sh && ./scripts/build/android.sh
 
+    - name: Rename build artifacts
+      run: |
+        mv ./fyne-cross/dist/linux-amd64/omamori.tar.xz ./fyne-cross/dist/linux-amd64/omamori-linux-amd64.tar.xz
+        mv ./fyne-cross/dist/linux-arm64/omamori.tar.xz ./fyne-cross/dist/linux-arm64/omamori-linux-arm64.tar.xz
+        mv ./fyne-cross/dist/windows-amd64/omamori.zip ./fyne-cross/dist/windows-amd64/omamori-windows-amd64.zip
+        mv ./fyne-cross/dist/windows-arm64/omamori.zip ./fyne-cross/dist/windows-arm64/omamori-windows-arm64.zip
+        mv ./fyne-cross/dist/android-arm64/omamori.apk ./fyne-cross/dist/android-arm64/omamori-android-arm64.apk
+
     - name: Upload linux-amd64 artifact
       uses: actions/upload-artifact@v4
       with:
         name: linux-amd64
-        path: ./fyne-cross/dist/linux-amd64/omamori.tar.xz
+        path: ./fyne-cross/dist/linux-amd64/omamori-linux-amd64.tar.xz
 
     - name: Upload linux-arm64 artifact
       uses: actions/upload-artifact@v4
       with:
         name: linux-arm64
-        path: ./fyne-cross/dist/linux-arm64/omamori.tar.xz
+        path: ./fyne-cross/dist/linux-arm64/omamori-linux-arm64.tar.xz
 
     - name: Upload windows-amd64 artifact
       uses: actions/upload-artifact@v4
       with:
         name: windows-amd64
-        path: ./fyne-cross/dist/windows-amd64/omamori.zip
+        path: ./fyne-cross/dist/windows-amd64/omamori-windows-amd64.zip
 
     - name: Upload windows-arm64 artifact
       uses: actions/upload-artifact@v4
       with:
         name: windows-arm64
-        path: ./fyne-cross/dist/windows-arm64/omamori.zip
+        path: ./fyne-cross/dist/windows-arm64/omamori-windows-arm64.zip
 
     - name: Upload android-arm64 artifact
       uses: actions/upload-artifact@v4
       with:
         name: android-arm64
-        path: ./fyne-cross/dist/android-arm64/omamori.apk
+        path: ./fyne-cross/dist/android-arm64/omamori-android-arm64.apk
 
-  create-release:
-    needs: [ build-omamori ]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    - name: Create Release
+      uses: ncipollo/release-action@v1.14.0
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        tag: ${{ steps.get_version.outputs.VERSION }}
+        name: Omamori ${{ steps.get_version.outputs.VERSION }}
+        draft: true
+        prerelease: false
+        generateReleaseNotes: true
+        artifacts: |
+          artifacts/linux-amd64/omamori-linux-amd64.tar.xz
+          artifacts/linux-arm64/omamori-linux-arm64.tar.xz
+          artifacts/windows-amd64/omamori-windows-amd64.zip
+          artifacts/windows-arm64/omamori-windows-arm64.zip
+          artifacts/android-arm64/omamori-android-arm64.apk
 
-      - name: Get the version
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
-      - name: Download linux-amd64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-amd64
-          path: ./artifacts/linux-amd64
-
-      - name: Download linux-arm64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: linux-arm64
-          path: ./artifacts/linux-arm64
-
-      - name: Download windows-amd64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-amd64
-          path: ./artifacts/windows-amd64
-
-      - name: Download windows-arm64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-arm64
-          path: ./artifacts/windows-arm64
-
-      - name: Download android-arm64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: android-arm64
-          path: ./artifacts/android-arm64
-
-      - name: Create Release
-        uses: ncipollo/release-action@v1.14.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ steps.get_version.outputs.VERSION }}
-          name: Omamori ${{ steps.get_version.outputs.VERSION }}
-          draft: true
-          prerelease: false
-          generateReleaseNotes: true
-          artifacts: |
-            artifacts/linux-amd64/*
-            artifacts/linux-arm64/*
-            artifacts/windows-amd64/*
-            artifacts/windows-arm64/*
-            artifacts/android-arm64/*
