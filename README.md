@@ -4,7 +4,7 @@
 
 ## Features
 
-- ✅ Domain Blocking via radix tree
+- ✅ Domain Blocking
 - ✅ DNS resolution with configurable upstream servers
 - ✅ LRU cache (1000 entries, 5s cleanup interval)
 - ✅ Supports all standard DNS record types
