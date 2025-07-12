@@ -10,7 +10,7 @@
 - ✅ Supports all standard DNS record types
 - ✅ DNS-over-HTTPS (DoH) support
 - ✅ Custom DNS Mapping
-- ✅ Cross-Platform GUI (Windows, Linux, Android)
+- ✅ Supports Windows and Linux
 - ✅ System DNS integration - Automatically sets system DNS to Omamori server
 
 
