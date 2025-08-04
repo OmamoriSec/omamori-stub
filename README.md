@@ -31,9 +31,6 @@ chmod +x scripts/build/linux.sh && ./scripts/build/linux.sh
 
 # Windows
 chmod +x scripts/build/windows.sh && ./scripts/build/windows.sh
-
-# Android
-chmod +x scripts/build/android.sh && ./scripts/build/android.sh
 ```
 
 Run with approriate privileges:
