@@ -29,16 +29,12 @@ jobs:
     - name: Build for windows
       run: chmod +x ./scripts/build/windows.sh && ./scripts/build/windows.sh
 
-    - name: Build for Android
-      run: chmod +x ./scripts/build/android.sh && ./scripts/build/android.sh
-
     - name: Rename build artifacts
       run: |
         mv ./fyne-cross/dist/linux-amd64/omamori.tar.xz ./fyne-cross/dist/linux-amd64/omamori-linux-amd64.tar.xz
         mv ./fyne-cross/dist/linux-arm64/omamori.tar.xz ./fyne-cross/dist/linux-arm64/omamori-linux-arm64.tar.xz
         mv ./fyne-cross/dist/windows-amd64/omamori.zip ./fyne-cross/dist/windows-amd64/omamori-windows-amd64.zip
         mv ./fyne-cross/dist/windows-arm64/omamori.zip ./fyne-cross/dist/windows-arm64/omamori-windows-arm64.zip
-        mv ./fyne-cross/dist/android-arm64/omamori.apk ./fyne-cross/dist/android-arm64/omamori-android-arm64.apk
 
     - name: Upload linux-amd64 artifact
       uses: actions/upload-artifact@v4
@@ -63,12 +59,6 @@ jobs:
       with:
         name: windows-arm64
         path: ./fyne-cross/dist/windows-arm64/omamori-windows-arm64.zip
-
-    - name: Upload android-arm64 artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: android-arm64
-        path: ./fyne-cross/dist/android-arm64/omamori-android-arm64.apk
 
   create-release:
     needs: [ build-omamori ]
@@ -107,12 +97,6 @@ jobs:
           name: windows-arm64
           path: artifacts/windows-arm64
 
-      - name: Download android-arm64 artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: android-arm64
-          path: artifacts/android-arm64
-
       - name: Create Release
         uses: ncipollo/release-action@v1.14.0
         with:
@@ -127,5 +111,3 @@ jobs:
             artifacts/linux-arm64/omamori-linux-arm64.tar.xz
             artifacts/windows-amd64/omamori-windows-amd64.zip
             artifacts/windows-arm64/omamori-windows-arm64.zip
-            artifacts/android-arm64/omamori-android-arm64.apk
-
