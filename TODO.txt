@@ -1,7 +1,0 @@
-// setupDNS method for trimurti [IMP]
-
-// handle error from the channel in UI [imp]
-
-// try to reduce redundant encode-decode [optional]
-
-// check how can we set the app-id in the program [optional]

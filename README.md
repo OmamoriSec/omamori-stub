@@ -4,13 +4,13 @@
 
 ## Features
 
-- ✅ Domain Blocking via radix tree
+- ✅ Domain Blocking
 - ✅ DNS resolution with configurable upstream servers
 - ✅ LRU cache (1000 entries, 5s cleanup interval)
 - ✅ Supports all standard DNS record types
 - ✅ DNS-over-HTTPS (DoH) support
 - ✅ Custom DNS Mapping
-- ✅ Cross-Platform GUI (Windows, Linux, Android)
+- ✅ Supports Windows and Linux
 - ✅ System DNS integration - Automatically sets system DNS to Omamori server
 
 
