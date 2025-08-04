@@ -11,16 +11,9 @@ import (
 	"omamori/app/core/dns"
 	"omamori/app/dohs"
 	"omamori/app/ui"
+	"os"
 	"time"
 )
-
-func writeResp(udpConn *net.UDPConn, resp []byte, addr *net.UDPAddr) {
-	_, err := udpConn.WriteToUDP(resp, addr)
-	if err != nil {
-		log.Println("Failed to send response:", err)
-	}
-
-}
 
 func loadConf() {
 
@@ -34,55 +27,64 @@ func loadConf() {
 
 }
 
-func startUdpServer(port int) (*net.UDPConn, error) {
-	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("127.0.0.1:%d", 53))
+var dnsJobChan = make(chan dnsJob, 500)
+
+type dnsJob struct {
+	data   []byte
+	conn   *net.UDPConn
+	source *net.UDPAddr
+}
+
+func startDnsWorkerPool(num int) {
+	log.Println("Starting DNS worker pool: ", num)
+	for i := 0; i < num; i++ {
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Println("Recovered from panic: ", r)
+				}
+			}()
+
+			for job := range dnsJobChan {
+				if job.data == nil {
+					// terminate
+					return
+				}
+				handleDNSRequest(job.data, job.conn, job.source)
+			}
+		}()
+	}
+}
+
+func startUdpServer(ctx context.Context, host string, port int) {
+
+	noOfDnsWorkers := 500
+	go startDnsWorkerPool(noOfDnsWorkers) // starting workers to handle DNS request
+
+	udpAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve UDP address: %s", err)
+		log.Println("Failed to resolve udp address:", err)
+		os.Exit(1)
 	}
 
 	udpConn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to bind to address: %s", err)
+		log.Println("Failed to bind to address", err)
+		os.Exit(1)
 	}
-
-	log.Println("Listening on", udpConn.LocalAddr().String())
 
 	// Log when server starts to confirm it's running
-	channels.LogEventChannel <- channels.Event{
-		Type:    channels.Log,
-		Payload: fmt.Sprintf("🚀 DNS Server started on port %d", port),
-	}
-
-	return udpConn, nil
-
-}
-
-func handleDNSRequest(ctx context.Context, port int) {
-
-	udpConn, err := startUdpServer(port)
-	if err != nil {
-		log.Println("Failed to start UDP server:", err)
-		// send the error into the event channel
-		channels.GlobalEventChannel <- channels.Event{Type: channels.Error, Payload: err}
-		return
-	}
+	log.Println("🚀 DNS Server started on port: ", port)
 
 	buf := make([]byte, 512)
-
-	channels.LogEventChannel <- channels.Event{
-		Type:    channels.Log,
-		Payload: "🎯 DNS Server ready to receive queries...",
-	}
-
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Shutting down udp server gracefully")
-			channels.LogEventChannel <- channels.Event{
-				Type:    channels.Log,
-				Payload: "🛑 DNS Server stopped",
-			}
+			log.Println("Shutting down UDP server gracefully")
 			_ = udpConn.Close()
+			for i := 0; i < noOfDnsWorkers; i++ {
+				dnsJobChan <- dnsJob{}
+			}
 			return
 		default:
 			_ = udpConn.SetReadDeadline(time.Now().Add(1 * time.Second))
@@ -92,28 +94,43 @@ func handleDNSRequest(ctx context.Context, port int) {
 				if errors.As(err, &ne) && ne.Timeout() {
 					continue // check context again
 				}
-				log.Println("Error receiving data:", err)
+				log.Println("Failed to read UDP packet:", err)
 				return
 			}
 
-			receivedData := buf[:size]
-			dq, err := dns.DecodeDNSQuery(receivedData)
-			if err != nil {
-				log.Println("Failed to decode DNS packet:", err)
-				// don't want to response to malformed packets
-				continue
-			}
+			// delegating to the go routine workers to avoid blocking the server
+			dnsJobChan <- dnsJob{data: append([]byte(nil), buf[:size]...), conn: udpConn, source: source}
 
-			dnsResponse := dns.Lookup(dq)
-			response, err := dnsResponse.Encode()
-
-			if err != nil {
-				log.Println("Error encoding DNS header:", err)
-			}
-
-			writeResp(udpConn, response, source)
 		}
 	}
+
+}
+
+func writeResp(udpConn *net.UDPConn, resp []byte, addr *net.UDPAddr) {
+	_, err := udpConn.WriteToUDP(resp, addr)
+	if err != nil {
+		log.Println("Failed to write response:", err)
+	}
+
+}
+
+func handleDNSRequest(receivedData []byte, udpConn *net.UDPConn, source *net.UDPAddr) {
+
+	dq, err := dns.DecodeDNSQuery(receivedData)
+	if err != nil {
+		log.Println("Failed to decode DNS query")
+		// don't want to response to malformed packets
+		return
+	}
+
+	dnsResponse := dns.Lookup(dq)
+	response, err := dnsResponse.Encode()
+
+	if err != nil {
+		log.Println("Error encoding DNS header:", err)
+	}
+
+	writeResp(udpConn, response, source)
 }
 
 func main() {
@@ -144,7 +161,7 @@ func main() {
 					continue
 				}
 				dnsCtx, dnsCancel = context.WithCancel(context.Background())
-				go handleDNSRequest(dnsCtx, configData.UdpServerPort)
+				go startUdpServer(dnsCtx, "127.0.0.1", configData.UdpServerPort)
 
 				if err := config.ConfigureSystemDNS(); err != nil {
 					channels.LogEventChannel <- channels.Event{

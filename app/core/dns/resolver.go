@@ -12,11 +12,16 @@ import (
 
 // =============== DNS RELATED METHODS ===============
 
-func resolvable(domain string) bool {
-	if blocked := config.BlockedSites.Search(config.ReverseDomain(domain)); blocked {
-		return false
+func resolveCustomDns(dnsQuery *Query) bool {
+	if customIp := config.BlockedSites.Search(config.ReverseDomain(dnsQuery.Questions.Name)); customIp != nil {
+		// both 0.0.0.0 and custom Ips will be included in this case
+		dnsQuery.Answer[0].Data = net.ParseIP(*customIp).To4()
+		channels.LogEventChannel <- channels.Event{Type: channels.Log,
+			Payload: *customIp}
+
+		return true
 	}
-	return true
+	return false
 }
 
 func Lookup(dnsQuery *Query) *Query {
@@ -49,8 +54,10 @@ func Lookup(dnsQuery *Query) *Query {
 	}
 	dnsQuery.Answer = []*Answer{defaultAnswer}
 
-	if !resolvable(dnsQuery.Questions.Name) {
-		log.Printf("%s is not resolvable\n", dnsQuery.Questions.Name)
+	if resolveCustomDns(dnsQuery) {
+		log.Printf("Custom DNS lookup enabled for %s\n", dnsQuery.Questions.Name)
+		channels.LogEventChannel <- channels.Event{Type: channels.Log,
+			Payload: fmt.Sprintf("Custom DNS lookup enabled for %s: %s\n", dnsQuery.Questions.Name, string(dnsQuery.Answer[0].Data))}
 		return dnsQuery
 	}
 

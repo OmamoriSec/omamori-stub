@@ -9,14 +9,14 @@ import (
 type Node struct {
 	children  map[string]*Node
 	endOfWord bool
-	data      string
+	data      *string
 }
 
 func NewRadixNode() *Node {
 	return &Node{
 		endOfWord: false,
 		children:  nil,
-		data:      "",
+		data:      nil,
 	}
 }
 
@@ -31,7 +31,7 @@ func (node *Node) hasChildren() bool {
 	return node.children != nil && len(node.children) > 0
 }
 
-func (node *Node) insert(word string, data string) {
+func (node *Node) insert(word string, data *string) {
 	currNode := node
 
 	for len(word) > 0 {
@@ -86,7 +86,7 @@ func (node *Node) deleteHelper(word string, depth int) bool {
 			return false // Word doesn't exist
 		}
 		node.endOfWord = false
-		node.data = ""
+		node.data = nil
 
 		// If node has no children, it can be deleted
 		return !node.hasChildren()
@@ -145,23 +145,29 @@ func (node *Node) deleteHelper(word string, depth int) bool {
 	return false
 }
 
-func (node *Node) search(word string) bool {
+func (node *Node) search(word string) *string {
 	currNode := node
 	for len(word) > 0 {
+		if currNode.children == nil {
+			return nil
+		}
+
 		found := false
+
 		for key, child := range currNode.children {
-			if strings.HasPrefix(word, key) {
+			if len(key) <= len(word) && word[:len(key)] == key {
 				word = word[len(key):]
 				currNode = child
 				found = true
 				break
 			}
 		}
+
 		if !found {
-			return false
+			return nil
 		}
 	}
-	return currNode.endOfWord
+	return currNode.data
 }
 
 func (node *Node) commonPrefixLength(word1 string, word2 string) int {
@@ -175,7 +181,7 @@ func (node *Node) commonPrefixLength(word1 string, word2 string) int {
 func (node *Node) getItems(items *map[string]string, currKey string) {
 	// return all the items from the specific node
 	if node.endOfWord {
-		(*items)[currKey] = node.data
+		(*items)[currKey] = *node.data
 	}
 
 	for edge, child := range node.children {
@@ -189,11 +195,11 @@ type Tree struct {
 	root *Node
 }
 
-func (tree *Tree) Insert(word string, data string) {
+func (tree *Tree) Insert(word string, data *string) {
 	tree.root.insert(word, data)
 }
 
-func (tree *Tree) Search(word string) bool {
+func (tree *Tree) Search(word string) *string {
 	return tree.root.search(word)
 }
 

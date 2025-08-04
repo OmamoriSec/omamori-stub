@@ -100,7 +100,8 @@ func LoadBlockedSites() error {
 			} else {
 				domain = strings.TrimSpace(entry[spaceIndex+1 : endIndex])
 			}
-			BlockedSites.Insert(ReverseDomain(domain), strings.TrimSpace(entry[:spaceIndex]))
+			trimmed := strings.TrimSpace(entry[:spaceIndex])
+			BlockedSites.Insert(ReverseDomain(domain), &trimmed)
 		}
 	}
 	return nil
@@ -116,7 +117,7 @@ func UpdateSiteList(operation string, siteData SiteData) error {
 	switch operation {
 	case "add":
 		log.Printf("Adding site: %s", siteData.Domain)
-		BlockedSites.Insert(ReverseDomain(siteData.Domain), siteData.IP)
+		BlockedSites.Insert(ReverseDomain(siteData.Domain), &siteData.IP)
 		_, _ = f.Write([]byte(fmt.Sprintf("%s %s", siteData.IP, siteData.Domain) + "\n"))
 		_ = f.Close()
 	case "delete":
