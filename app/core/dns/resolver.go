@@ -12,25 +12,20 @@ import (
 
 // =============== DNS RELATED METHODS ===============
 
-func resolveCustomDns(dnsQuery *Query) bool {
-	if customIp := config.BlockedSites.Search(config.ReverseDomain(dnsQuery.Questions.Name)); customIp != nil {
+func resolveCustomDns(domainName string) (string, bool) {
+	if customIp := config.BlockedSites.Search(config.ReverseDomain(domainName)); customIp != nil {
 		// both 0.0.0.0 and custom Ips will be included in this case
-		dnsQuery.Answer[0].Data = net.ParseIP(*customIp).To4()
-		channels.LogEventChannel <- channels.Event{Type: channels.Log,
-			Payload: *customIp}
-
-		return true
+		return *customIp, true
 	}
-	return false
+	return "", false
 }
 
-func Lookup(dnsQuery *Query) *Query {
+func Lookup(dnsQuery *Query) []byte {
 
 	flags := dnsQuery.Header.FLAGS
 	// update header according to answer
 	dnsQuery.Header.QDCOUNT = 1
 	dnsQuery.Header.ARCOUNT = 0
-	dnsQuery.Header.ANCOUNT = 1
 
 	// Setting QR (bit 15)
 	dnsQuery.Header.FLAGS = dnsQuery.Header.FLAGS | 1<<15
@@ -39,36 +34,31 @@ func Lookup(dnsQuery *Query) *Query {
 	dnsQuery.Header.FLAGS = dnsQuery.Header.FLAGS | 1<<7
 
 	encodedName, err := encodeDomainName(dnsQuery.Questions.Name)
+
 	if err != nil {
 		log.Printf("Error encoding domain name %s: %s\n", dnsQuery.Questions.Name, err)
-		return dnsQuery
+		return nil
 	}
 
-	defaultAnswer := &Answer{
-		encodedName,
-		dnsQuery.Questions.Type,
-		dnsQuery.Questions.Class,
-		600,
-		1 << 2,
-		net.ParseIP("0.0.0.0").To4(),
-	}
-	dnsQuery.Answer = []*Answer{defaultAnswer}
-
-	if resolveCustomDns(dnsQuery) {
-		log.Printf("Custom DNS lookup enabled for %s\n", dnsQuery.Questions.Name)
+	if customIP, resolved := resolveCustomDns(dnsQuery.Questions.Name); resolved {
 		channels.LogEventChannel <- channels.Event{Type: channels.Log,
-			Payload: fmt.Sprintf("Custom DNS lookup enabled for %s: %s\n", dnsQuery.Questions.Name, string(dnsQuery.Answer[0].Data))}
-		return dnsQuery
+			Payload: fmt.Sprintf("Custom DNS lookup enabled for %s: %s\n", dnsQuery.Questions.Name, customIP)}
+
+		dnsQuery.Answer = []*Answer{{
+			encodedName,
+			dnsQuery.Questions.Type,
+			dnsQuery.Questions.Class,
+			600,
+			1 << 2,
+			net.ParseIP(customIP).To4(),
+		}}
+		dnsQuery.Header.ANCOUNT = 1
+		resp, _ := dnsQuery.Encode()
+		return resp
 	}
 
 	cachedRecord, found := cache.DnsCache.Get(dnsQuery.Questions.Name, dnsQuery.Questions.Type)
 	if found {
-		encodedName, err := encodeDomainName(dnsQuery.Questions.Name)
-		if err != nil {
-			log.Printf("Error encoding domain name %s: %s\n", dnsQuery.Questions.Name, err)
-			return dnsQuery
-		}
-
 		// update answer
 		cachedAnswer := &Answer{
 			encodedName,
@@ -81,12 +71,12 @@ func Lookup(dnsQuery *Query) *Query {
 
 		dnsQuery.Answer = []*Answer{cachedAnswer}
 		dnsQuery.Header.ANCOUNT = 1
-
 		channels.LogEventChannel <- channels.Event{
 			Type:    channels.Log,
 			Payload: fmt.Sprintf("Cache hit for %s\n", dnsQuery.Questions.Name),
 		}
-		return dnsQuery
+		resp, _ := dnsQuery.Encode()
+		return resp
 	}
 
 	// update answer as per upstream
@@ -115,7 +105,7 @@ func Lookup(dnsQuery *Query) *Query {
 
 		if err != nil {
 			log.Printf("Error %s\n", err)
-			return dnsQuery
+			continue
 		}
 
 		_, err = conn.Write(upstreamQuery)
@@ -124,7 +114,7 @@ func Lookup(dnsQuery *Query) *Query {
 			continue
 		}
 
-		_ = conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 
 		buf := make([]byte, 512)
 		n, err := conn.Read(buf)
@@ -133,10 +123,25 @@ func Lookup(dnsQuery *Query) *Query {
 			continue
 		}
 
+		responseCode := uint16(buf[:n][3] & 0x0F) // get the last 4 bits of the 3rd byte
+		// updating RCODE
+		dnsQuery.Header.FLAGS = (dnsQuery.Header.FLAGS & 0xFFF0) | responseCode
+
+		fmt.Println(responseCode)
+
+		if responseCode == 2 || responseCode == 5 { // check for the Rcode first, before trying to parse answer
+			// case of server failure & refused
+			log.Printf("Received error response from upstream: %d", responseCode)
+			continue
+		} else if responseCode != 0 {
+			resp, _ := dnsQuery.Encode()
+			dnsQuery.Header.ANCOUNT = 0
+			return resp
+		}
+
 		responses, err := decodeDnsAnswer(buf[:n])
 		if err != nil {
 			log.Printf("Error while fetching answer for %s [Record %d] via %s: %s\n", dnsQuery.Questions.Name, dnsQuery.Questions.Type, upstream, err)
-			log.Printf("Received: %v", buf[:n])
 			continue
 		}
 
@@ -160,5 +165,6 @@ func Lookup(dnsQuery *Query) *Query {
 		break
 	}
 
-	return dnsQuery
+	resp, _ := dnsQuery.Encode()
+	return resp
 }

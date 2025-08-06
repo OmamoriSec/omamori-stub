@@ -223,9 +223,6 @@ func decodeDnsAnswer(data []byte) ([]*Answer, error) {
 	}
 
 	anCount := binary.BigEndian.Uint16(data[6:8])
-	if anCount == 0 {
-		return nil, errors.New("no answers in DNS response")
-	}
 
 	offset := 12 // as we skipped header
 

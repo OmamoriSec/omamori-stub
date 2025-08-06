@@ -124,13 +124,7 @@ func handleDNSRequest(receivedData []byte, udpConn *net.UDPConn, source *net.UDP
 	}
 
 	dnsResponse := dns.Lookup(dq)
-	response, err := dnsResponse.Encode()
-
-	if err != nil {
-		log.Println("Error encoding DNS header:", err)
-	}
-
-	writeResp(udpConn, response, source)
+	writeResp(udpConn, dnsResponse, source)
 }
 
 func main() {

@@ -103,7 +103,6 @@ func generateDnsResponse(w http.ResponseWriter, data []byte) {
 	}
 	log.Println(dnsQuery)
 	dnsResp := dns.Lookup(dnsQuery)
-	resp, _ := dnsResp.Encode()
 	w.Header().Set("Content-Type", "application/dns-message")
-	_, _ = w.Write(resp)
+	_, _ = w.Write(dnsResp)
 }
